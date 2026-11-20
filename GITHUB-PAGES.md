@@ -61,3 +61,16 @@ Le modifiche ai documenti del Drive compaiono al prossimo login o logout, come d
 
 ## Avvertenza
 La chiave API arriva comunque nel codice del sito, perché l'app gira nel browser. Per questo la protezione reale è la restrizione del referrer. Il login `admin` / `0000` è solo una barriera di comodo (vedi README, sezione Sicurezza).
+
+## Copia precompilata (caricamento rapido)
+
+Di default ogni nuovo dispositivo scarica e converte tutti i documenti dal Drive al primo accesso.
+Per evitarlo, puoi pubblicare una copia già pronta:
+
+1. Apri la biblioteca su un computer già aggiornato, vai in Home e apri **Copia per il caricamento rapido**.
+2. Premi **Scarica snapshot.json**.
+3. Copia il file in `src/assets/snapshot.json` del progetto (sostituisci quello eventuale).
+4. Carica le modifiche su GitHub (o rilancia il workflow): il sito pubblicato include la copia.
+
+I dispositivi nuovi scaricano questo file in un'unica richiesta. Poi il login confronta soltanto la struttura del Drive
+e riscarica i soli documenti cambiati. Ripeti i passi 1-4 ogni tanto, quando hai aggiornato molti documenti.

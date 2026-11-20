@@ -41,6 +41,32 @@ export function displayName(name: string): string {
   return name.replace(/\.(docx?|dotx?|odt|rtf|pdf|md|txt|xlsx?|pptx?|gdoc)$/i, '').trim();
 }
 
+/** Richieste a Drive contemporanee: evita di saturare la rete e i limiti di Google. */
+const MAX_CONCURRENT = 2;
+/** Pause tra un tentativo e il successivo, in millisecondi (errori temporanei). */
+const RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000];
+let active = 0;
+const waiting: Array<() => void> = [];
+
+async function slot<T>(fn: () => Promise<T>): Promise<T> {
+  if (active >= MAX_CONCURRENT) await new Promise<void>(r => waiting.push(r));
+  else active++;
+  try {
+    return await fn();
+  } finally {
+    // passa il posto al prossimo in coda, oppure lo libera
+    const next = waiting.shift();
+    if (next) next();
+    else active--;
+  }
+}
+
+function retryable(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 @Injectable({ providedIn: 'root' })
 export class DriveService {
   private key = environment.apiKey;
@@ -49,8 +75,41 @@ export class DriveService {
     return !!this.key && !this.key.startsWith('INSERISCI');
   }
 
+  /**
+   * Chiamata a Drive con limite di contemporaneità e nuovi tentativi
+   * per errori di rete, 429 (troppe richieste) e 5xx.
+   */
+  private async request(url: string): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      let res: Response;
+      try {
+        res = await slot(() => fetch(url));
+      } catch {
+        // rete assente o interrotta: "failed to fetch"
+        if (attempt >= RETRY_DELAYS.length) {
+          throw new Error(
+            'Connessione a Google Drive non riuscita dopo più tentativi. Controlla la rete: resta disponibile la copia salvata.'
+          );
+        }
+        await pause(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      if (res.ok) return res;
+      let limited = false;
+      if (res.status === 403) {
+        // Google usa 403 anche per i limiti di richieste
+        limited = /rateLimit|quota/i.test(await res.clone().text().catch(() => ''));
+      }
+      if ((retryable(res.status) || limited) && attempt < RETRY_DELAYS.length) {
+        await pause(RETRY_DELAYS[attempt]);
+        continue;
+      }
+      return res;
+    }
+  }
+
   private async getJson(url: string): Promise<any> {
-    const res = await fetch(url);
+    const res = await this.request(url);
     if (!res.ok) throw new Error(await this.explain(res));
     return res.json();
   }
@@ -126,14 +185,14 @@ export class DriveService {
       const p = new URLSearchParams({ alt: 'media', supportsAllDrives: 'true', key: this.key });
       url = `${API}/files/${node.id}?${p}`;
     }
-    const res = await fetch(url);
+    const res = await this.request(url);
     if (!res.ok) throw new Error(await this.explain(res));
     return res.arrayBuffer();
   }
 
   async downloadText(node: TreeNode): Promise<string> {
     const p = new URLSearchParams({ alt: 'media', supportsAllDrives: 'true', key: this.key });
-    const res = await fetch(`${API}/files/${node.id}?${p}`);
+    const res = await this.request(`${API}/files/${node.id}?${p}`);
     if (!res.ok) throw new Error(await this.explain(res));
     return res.text();
   }

@@ -28,6 +28,18 @@ import { LookupService, isDocNode } from './lookup.service';
       </a>
     </div>
 
+    <details class="admin-box">
+      <summary>Copia per il caricamento rapido</summary>
+      <p class="muted">
+        Scarica un file con tutti i documenti salvati su questo dispositivo. Copialo in
+        <code>src/assets/snapshot.json</code> e pubblica di nuovo il sito: i nuovi dispositivi
+        apriranno la biblioteca in pochi secondi, senza scaricare tutto dal Drive.
+      </p>
+      <button type="button" class="ghost" (click)="library.exportSnapshot()" [disabled]="!library.tree()">
+        Scarica snapshot.json
+      </button>
+    </details>
+
     @if (looseFiles().length) {
       <h2>Altri file</h2>
       <ul class="list">

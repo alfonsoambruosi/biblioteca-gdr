@@ -7,40 +7,84 @@ import { LibraryService } from './library.service';
 import { LookupService } from './lookup.service';
 import { esc } from './doc-parser';
 
+const TOC_KEY = 'bgdr-toc';
+const PANEL_KEY = 'bgdr-panel-h';
+const PANEL_MIN = 120;
+
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* memoria del browser piena o disattivata: non è essenziale */
+  }
+}
+
 @Component({
   selector: 'app-doc',
   imports: [RouterLink],
   template: `
-    <nav class="crumbs" aria-label="Percorso">
-      <a routerLink="/">Home</a>
-      @for (n of crumbs(); track n.id) {
-        <span>›</span>
-        <a [routerLink]="['/cartella', n.id]">{{ n.name }}</a>
-      }
-    </nav>
-
-    <h1>{{ title() }}</h1>
-
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    } @else if (loading()) {
-      <p class="muted">Caricamento del documento…</p>
-    }
-
-    @if (toc().length) {
-      <details class="toc">
-        <summary>Indice di questo documento ({{ toc().length }} voci)</summary>
-        <ol>
-          @for (s of toc(); track s.id) {
-            <li [class]="'l' + s.level"><button type="button" (click)="jump(s.id)">{{ s.heading }}</button></li>
+    <div class="doc-wrap">
+      @if (toc().length) {
+        <div class="side" [class.open]="tocOpen()">
+          <button type="button" class="ghost toc-toggle" [attr.aria-expanded]="tocOpen()" (click)="toggleToc()">
+            {{ tocOpen() ? 'Nascondi indice' : 'Mostra indice' }}
+          </button>
+          @if (tocOpen()) {
+            <aside class="toc-side" aria-label="Indice del documento">
+              <p class="toc-title">Indice · {{ toc().length }} voci</p>
+              <ol>
+                @for (s of toc(); track s.id) {
+                  <li [class]="'l' + s.level"><button type="button" (click)="jump(s.id)">{{ s.heading }}</button></li>
+                }
+              </ol>
+            </aside>
           }
-        </ol>
-      </details>
-    }
+        </div>
+      }
 
-    <div class="content" (click)="onClick($event)" [innerHTML]="html()"></div>
+      <div class="doc-main">
+        <nav class="crumbs" aria-label="Percorso">
+          <a routerLink="/">Home</a>
+          @for (n of crumbs(); track n.id) {
+            <span>›</span>
+            <a [routerLink]="['/cartella', n.id]">{{ n.name }}</a>
+          }
+        </nav>
 
-    <aside class="seed-panel" [hidden]="!panel()">
+        <h1>{{ title() }}</h1>
+
+        @if (error()) {
+          <p class="error" role="alert">{{ error() }}</p>
+        } @else if (loading()) {
+          <p class="muted">Caricamento del documento…</p>
+        }
+
+        <div class="content" (click)="onClick($event)" [innerHTML]="html()"></div>
+      </div>
+    </div>
+
+    <aside class="seed-panel" [style.height.px]="panelH()" [hidden]="!panel()">
+      <div
+        class="seed-grip"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Trascina per alzare o abbassare il riquadro"
+        tabindex="0"
+        [attr.aria-valuenow]="panelH()"
+        (pointerdown)="startResize($event)"
+        (pointermove)="moveResize($event)"
+        (pointerup)="endResize()"
+        (pointercancel)="endResize()"
+        (keydown)="keyResize($event)"
+      ></div>
       <div class="seed-panel-head">
         <strong>{{ panelTitle() }}</strong>
         <button type="button" class="ghost" (click)="closePanel()">Chiudi</button>
@@ -76,11 +120,18 @@ export class DocComponent {
     return (m?.sections ?? []).filter(s => !!s.heading && s.level <= 5);
   });
 
+  /** Indice a sinistra: aperto di default su schermi larghi, ricordato sul dispositivo. */
+  readonly tocOpen = signal(readStorage(TOC_KEY) === '1' || (readStorage(TOC_KEY) === null && window.innerWidth >= 900));
+
   readonly html = signal<SafeHtml>(this.sanitizer.bypassSecurityTrustHtml(''));
   readonly loading = signal(false);
   readonly error = signal('');
   readonly panel = signal<SafeHtml | null>(null);
   readonly panelTitle = signal('');
+
+  /** Altezza del riquadro delle spell, in pixel: si regola trascinando la barra in alto. */
+  readonly panelH = signal(Number(readStorage(PANEL_KEY)) || Math.round(window.innerHeight * 0.4));
+  private drag: { y: number; h: number } | null = null;
 
   constructor() {
     // Ricarica quando cambia il documento o quando il Drive viene riletto.
@@ -96,6 +147,11 @@ export class DocComponent {
         }
       });
     });
+  }
+
+  toggleToc(): void {
+    this.tocOpen.update(v => !v);
+    writeStorage(TOC_KEY, this.tocOpen() ? '1' : '0');
   }
 
   private async load(id: string): Promise<void> {
@@ -169,12 +225,47 @@ export class DocComponent {
     this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html));
   }
 
-  /** Porta al titolo scelto nell'indice. */
+  /** Porta al titolo scelto nell'indice (su telefono chiude il pannello laterale). */
   jump(id: string): void {
+    if (window.innerWidth < 900 && this.tocOpen()) this.toggleToc();
     document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
 
   closePanel(): void {
     this.panel.set(null);
+  }
+
+  // ---------------------------------------------------------------- altezza del riquadro
+
+  private clampPanel(h: number): number {
+    return Math.min(window.innerHeight - 40, Math.max(PANEL_MIN, Math.round(h)));
+  }
+
+  startResize(ev: PointerEvent): void {
+    ev.preventDefault();
+    (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
+    this.drag = { y: ev.clientY, h: this.panelH() };
+  }
+
+  moveResize(ev: PointerEvent): void {
+    if (!this.drag) return;
+    // trascinando verso l'alto il riquadro cresce
+    this.panelH.set(this.clampPanel(this.drag.h + (this.drag.y - ev.clientY)));
+  }
+
+  endResize(): void {
+    if (!this.drag) return;
+    this.drag = null;
+    writeStorage(PANEL_KEY, String(this.panelH()));
+  }
+
+  /** Stessa regolazione da tastiera: frecce su/giù, con Shift a passi più grandi. */
+  keyResize(ev: KeyboardEvent): void {
+    const step = ev.shiftKey ? 80 : 20;
+    if (ev.key === 'ArrowUp') this.panelH.set(this.clampPanel(this.panelH() + step));
+    else if (ev.key === 'ArrowDown') this.panelH.set(this.clampPanel(this.panelH() - step));
+    else return;
+    ev.preventDefault();
+    writeStorage(PANEL_KEY, String(this.panelH()));
   }
 }

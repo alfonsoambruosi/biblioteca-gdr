@@ -1,11 +1,11 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { get, set, del } from 'idb-keyval';
+import { get, set, setMany, del } from 'idb-keyval';
 import MiniSearch from 'minisearch';
 import * as mammoth from 'mammoth/mammoth.browser';
 import { environment } from '../environments/environment';
 import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
-import { DocMeta, SearchHit, Section, TreeNode } from './models';
+import { DocMeta, SearchHit, Section, Snapshot, TreeNode } from './models';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -74,9 +74,11 @@ export class LibraryService {
    * Se è già in corso, restituisce la stessa verifica.
    */
   verify(): Promise<void> {
-    this.running ??= this.runVerify().finally(() => (this.running = null));
+    this.running ??= this.checkTree().finally(() => (this.running = null));
     return this.running;
   }
+
+  private downloading: Promise<void> | null = null;
 
   private async loadCache(): Promise<void> {
     if (this.cacheLoaded) return;
@@ -92,8 +94,15 @@ export class LibraryService {
     this.version.update(v => v + 1);
   }
 
-  private async runVerify(): Promise<void> {
+  /**
+   * Fase 1 (veloce, aspettata da login e logout): legge l'elenco di cartelle e file
+   * e lo confronta con la copia salvata.
+   * Fase 2 (in background): scarica solo i file nuovi o cambiati. Se un file fallisce
+   * non blocca gli altri e verrà ritentato alla verifica successiva.
+   */
+  private async checkTree(): Promise<void> {
     await this.loadCache();
+    await this.importSnapshot();
     if (!this.configured) {
       this.status.set('error');
       this.fatalError.set(
@@ -101,44 +110,121 @@ export class LibraryService {
       );
       return;
     }
+    this.status.set('checking');
+    this.statusText.set('Controllo il Drive…');
+    let tree: TreeNode;
     try {
-      this.status.set('checking');
-      this.statusText.set('Controllo il Drive…');
-      const tree = await this.drive.buildTree(environment.driveRootId);
-      this.setTree(tree);
-      await set('tree', tree);
-
-      // rimuove ciò che non esiste più nel Drive
-      const files = this.files();
-      const present = new Set(files.map(f => f.id));
-      for (const id of Array.from(this.metas.keys())) if (!present.has(id)) this.removeFromIndex(id);
-
-      // scarica solo i file nuovi o cambiati
-      const stale = files.filter(f => this.isStale(f));
-      this.total.set(stale.length);
-      this.done.set(0);
-      if (stale.length) {
-        this.status.set('syncing');
-        this.statusText.set('Aggiorno i documenti modificati…');
-        await this.pool(stale, 3, async f => {
-          await this.sync(f);
-          this.done.update(d => d + 1);
-          await new Promise(r => setTimeout(r)); // lascia respirare l'interfaccia
-        });
-      }
-
-      const now = new Date();
-      this.lastCheck.set(now);
-      await set('lastCheck', now.toISOString());
-      this.fatalError.set('');
-      this.status.set('idle');
-      this.statusText.set('');
-      this.version.update(v => v + 1);
+      tree = await this.drive.buildTree(environment.driveRootId);
     } catch (e: any) {
-      // senza rete o con errore dell'API resta la copia salvata
+      // senza rete o con errore dell'API resta la copia salvata, l'app si apre comunque
       this.status.set('error');
       this.fatalError.set(e?.message ?? String(e));
+      this.statusText.set('');
+      return;
     }
+    this.fatalError.set('');
+    this.setTree(tree);
+    await set('tree', tree);
+
+    // rimuove ciò che non esiste più nel Drive
+    const files = this.files();
+    const present = new Set(files.map(f => f.id));
+    for (const id of Array.from(this.metas.keys())) if (!present.has(id)) this.removeFromIndex(id);
+
+    const stale = files.filter(f => this.isStale(f));
+    this.version.update(v => v + 1);
+    if (stale.length) {
+      void this.downloadStale(stale);
+    } else {
+      await this.finishCheck();
+    }
+  }
+
+  /**
+   * Carica la copia precompilata (assets/snapshot.json) in un'unica richiesta.
+   * Importa solo i documenti che il dispositivo non ha ancora: quelli cambiati
+   * vengono poi confrontati con il Drive e riscaricati solo se necessario.
+   */
+  private async importSnapshot(): Promise<void> {
+    let snap: Snapshot;
+    try {
+      const res = await fetch('assets/snapshot.json', { cache: 'no-cache' });
+      if (!res.ok) return; // nessuna copia precompilata: si legge dal Drive
+      snap = await res.json();
+    } catch {
+      return;
+    }
+    if (!snap?.docs || !snap.tree) return;
+    if ((await get<string>('snapshotAt')) === snap.generatedAt) return;
+
+    if (!this.tree()) {
+      this.setTree(snap.tree);
+      await set('tree', snap.tree);
+    }
+    const entries: [string, unknown][] = [];
+    for (const [id, d] of Object.entries(snap.docs)) {
+      if (this.metas.has(id)) continue;
+      entries.push([`html:${id}`, d.html], [`meta:${id}`, d.meta]);
+      this.addToIndex(d.meta);
+    }
+    if (entries.length) await setMany(entries);
+    await set('snapshotAt', snap.generatedAt);
+    this.version.update(v => v + 1);
+  }
+
+  /**
+   * Crea il file snapshot.json con tutti i documenti salvati su questo dispositivo.
+   * Va copiato in src/assets/snapshot.json e pubblicato di nuovo: così i nuovi
+   * dispositivi non devono scaricare e convertire tutto dal Drive.
+   */
+  async exportSnapshot(): Promise<void> {
+    const docs: Snapshot['docs'] = {};
+    for (const f of this.files()) {
+      const meta = this.metas.get(f.id);
+      const html = await get<string>(`html:${f.id}`);
+      if (meta && html != null) docs[f.id] = { meta, html };
+    }
+    const tree = this.tree();
+    if (!tree) return;
+    const snap: Snapshot = { generatedAt: new Date().toISOString(), tree, docs };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(snap)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'snapshot.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  private downloadStale(stale: TreeNode[]): Promise<void> {
+    this.downloading ??= this.runDownloads(stale).finally(() => (this.downloading = null));
+    return this.downloading;
+  }
+
+  private async runDownloads(stale: TreeNode[]): Promise<void> {
+    this.total.set(stale.length);
+    this.done.set(0);
+    this.status.set('syncing');
+    this.statusText.set('Aggiorno i documenti modificati…');
+    await this.pool(stale, 2, async f => {
+      try {
+        await this.sync(f);
+      } catch {
+        // l'errore resta in docErrors: il documento viene ritentato alla prossima verifica
+      }
+      this.done.update(d => d + 1);
+      await new Promise(r => setTimeout(r)); // lascia respirare l'interfaccia
+    });
+    await this.finishCheck();
+  }
+
+  private async finishCheck(): Promise<void> {
+    const now = new Date();
+    this.lastCheck.set(now);
+    await set('lastCheck', now.toISOString());
+    // documenti non letti: li segnala syncText ("N documenti non letti"), senza bloccare nulla
+    this.status.set('idle');
+    this.statusText.set('');
+    this.version.update(v => v + 1);
   }
 
   private setTree(t: TreeNode): void {

@@ -77,7 +77,8 @@ export class ShellComponent {
   async logout(): Promise<void> {
     this.leaving.set(true);
     try {
-      await this.library.verify();
+      // attesa massima: se Drive non risponde si esce comunque con la copia salvata
+      await Promise.race([this.library.verify(), new Promise(r => setTimeout(r, 15000))]);
     } finally {
       this.auth.logout();
       this.leaving.set(false);

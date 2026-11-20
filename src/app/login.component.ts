@@ -57,8 +57,10 @@ export class LoginComponent {
     }
     this.error.set(false);
     this.busy.set(true);
-    // Prima di entrare: confronta la copia salvata con il Drive e aggiorna solo ciò che è cambiato.
-    await this.library.verify();
+    // Prima di entrare: confronta l'elenco del Drive con la copia salvata (pochi secondi).
+    // I documenti modificati si scaricano in background, senza tenere ferma la schermata.
+    // Attesa massima: se Drive non risponde si entra comunque con la copia salvata.
+    await Promise.race([this.library.verify(), new Promise(r => setTimeout(r, 15000))]);
     this.busy.set(false);
     // Torna alla pagina richiesta (solo percorsi interni).
     const back = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
