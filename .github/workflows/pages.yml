@@ -1,3 +1,5 @@
+# Pubblica l'app su GitHub Pages a ogni modifica del ramo main.
+# La chiave API non è nel codice: viene letta dal segreto DRIVE_API_KEY del repository.
 name: Pubblica su GitHub Pages
 
 on:
