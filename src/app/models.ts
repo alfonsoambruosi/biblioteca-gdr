@@ -38,7 +38,7 @@ export interface SearchHit {
   snippet: string;   // HTML già escapato, con <mark>
 }
 
-/** Copia precompilata dei documenti (assets/snapshot.json), caricata al primo accesso. */
+/** Copia precompilata dei documenti (assets/snapshot.jsonl), caricata al primo accesso. */
 export interface Snapshot {
   generatedAt: string;
   tree: TreeNode;

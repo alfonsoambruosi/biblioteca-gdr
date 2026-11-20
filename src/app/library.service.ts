@@ -5,7 +5,7 @@ import * as mammoth from 'mammoth/mammoth.browser';
 import { environment } from '../environments/environment';
 import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
-import { DocMeta, SearchHit, Section, Snapshot, TreeNode } from './models';
+import { DocMeta, SearchHit, Section, TreeNode } from './models';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -147,35 +147,76 @@ export class LibraryService {
   }
 
   /**
-   * Carica la copia precompilata (assets/snapshot.json) in un'unica richiesta.
+   * Carica la copia precompilata (assets/snapshot.jsonll) a pezzi: una riga per documento,
+   * così il file non viene mai letto come un unico testo gigante.
    * Importa solo i documenti che il dispositivo non ha ancora: quelli cambiati
    * vengono poi confrontati con il Drive e riscaricati solo se necessario.
    */
   private async importSnapshot(): Promise<void> {
-    let snap: Snapshot;
+    let res: Response;
     try {
-      const res = await fetch('assets/snapshot.json', { cache: 'no-cache' });
-      if (!res.ok) return; // nessuna copia precompilata: si legge dal Drive
-      snap = await res.json();
+      res = await fetch('assets/snapshot.jsonll', { cache: 'no-cache' });
     } catch {
       return;
     }
-    if (!snap?.docs || !snap.tree) return;
-    if ((await get<string>('snapshotAt')) === snap.generatedAt) return;
+    if (!res.ok || !res.body) return; // nessuna copia precompilata: si legge dal Drive
 
-    if (!this.tree()) {
-      this.setTree(snap.tree);
-      await set('tree', snap.tree);
-    }
-    const entries: [string, unknown][] = [];
-    for (const [id, d] of Object.entries(snap.docs)) {
-      if (this.metas.has(id)) continue;
-      entries.push([`html:${id}`, d.html], [`meta:${id}`, d.meta]);
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = '';
+    let header: { generatedAt: string; tree: TreeNode } | null = null;
+    let pending: [string, unknown][] = [];
+    let skip = false;
+
+    const flush = async () => {
+      if (pending.length) await setMany(pending);
+      pending = [];
+    };
+    const handle = async (line: string) => {
+      if (!line.trim() || skip) return;
+      const obj = JSON.parse(line);
+      if (!header) {
+        header = obj as { generatedAt: string; tree: TreeNode };
+        if (!header.tree) return;
+        if ((await get<string>('snapshotAt')) === header.generatedAt) {
+          skip = true;
+          return;
+        }
+        if (!this.tree()) {
+          this.setTree(header.tree);
+          await set('tree', header.tree);
+        }
+        return;
+      }
+      const d = obj as { id: string; meta: DocMeta; html: string };
+      if (this.metas.has(d.id)) return;
+      pending.push([`html:${d.id}`, d.html], [`meta:${d.id}`, d.meta]);
       this.addToIndex(d.meta);
+      if (pending.length >= 200) await flush();
+    };
+
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += value;
+        let nl = buf.indexOf('\n');
+        while (nl >= 0) {
+          const line = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          await handle(line);
+          if (skip) return;
+          nl = buf.indexOf('\n');
+        }
+      }
+      if (buf.trim()) await handle(buf);
+    } finally {
+      // salva quanto letto, anche se il file si interrompe a metà
+      await flush();
     }
-    if (entries.length) await setMany(entries);
-    await set('snapshotAt', snap.generatedAt);
-    this.version.update(v => v + 1);
+    if (header && !skip) {
+      await set('snapshotAt', (header as { generatedAt: string }).generatedAt);
+      this.version.update(v => v + 1);
+    }
   }
 
   /** Stato dell'esportazione, mostrato nella Home. */
@@ -183,8 +224,8 @@ export class LibraryService {
   readonly exportInfo = signal('');
 
   /**
-   * Crea il file snapshot.json con i documenti salvati su questo dispositivo.
-   * Va copiato in src/assets/snapshot.json e pubblicato di nuovo.
+   * Crea il file snapshot.jsonl con i documenti salvati su questo dispositivo.
+   * Va copiato in src/assets/snapshot.jsonl e pubblicato di nuovo.
    */
   async exportSnapshot(): Promise<void> {
     this.exporting.set('working');
@@ -193,27 +234,30 @@ export class LibraryService {
       const tree = this.tree();
       if (!tree) throw new Error('la biblioteca non è ancora caricata.');
       const files = this.files();
-      const docs: Snapshot['docs'] = {};
+      // un documento per riga, senza mai creare un unico testo gigante
+      const parts: BlobPart[] = [JSON.stringify({ generatedAt: new Date().toISOString(), tree }) + '\n'];
+      let exported = 0;
       for (const f of files) {
         const meta = this.metas.get(f.id);
         const html = await get<string>(`html:${f.id}`);
-        if (meta && html != null) docs[f.id] = { meta, html };
+        if (meta && html != null) {
+          parts.push(JSON.stringify({ id: f.id, meta, html }) + '\n');
+          exported++;
+        }
       }
-      const exported = Object.keys(docs).length;
       const missing = files.length - exported;
-      const snap: Snapshot = { generatedAt: new Date().toISOString(), tree, docs };
-      const json = JSON.stringify(snap);
-      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'snapshot.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const blob = new Blob(parts, { type: 'application/x-ndjson' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'snapshot.jsonll';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       this.exporting.set('done');
       this.exportInfo.set(
-        `File creato con ${exported} documenti (${(json.length / 1e6).toFixed(1)} MB). ` +
+        `File creato con ${exported} documenti (${(blob.size / 1e6).toFixed(1)} MB). ` +
           (missing ? `${missing} documenti non sono ancora salvati e mancano nel file. ` : '') +
           'Controlla la cartella Download del browser.'
       );

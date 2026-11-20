@@ -68,8 +68,8 @@ Di default ogni nuovo dispositivo scarica e converte tutti i documenti dal Drive
 Per evitarlo, puoi pubblicare una copia già pronta:
 
 1. Apri la biblioteca su un computer già aggiornato, vai in Home e apri **Copia per il caricamento rapido**.
-2. Premi **Scarica snapshot.json**.
-3. Copia il file in `src/assets/snapshot.json` del progetto (sostituisci quello eventuale).
+2. Premi **Scarica snapshot.jsonl**.
+3. Copia il file in `src/assets/snapshot.jsonl` del progetto (sostituisci quello eventuale).
 4. Carica le modifiche su GitHub (o rilancia il workflow): il sito pubblicato include la copia.
 
 I dispositivi nuovi scaricano questo file in un'unica richiesta. Poi il login confronta soltanto la struttura del Drive

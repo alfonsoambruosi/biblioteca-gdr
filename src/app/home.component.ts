@@ -32,7 +32,7 @@ import { LookupService, isDocNode } from './lookup.service';
       <summary>Copia per il caricamento rapido</summary>
       <p class="muted">
         Scarica un file con tutti i documenti salvati su questo dispositivo. Copialo in
-        <code>src/assets/snapshot.json</code> e pubblica di nuovo il sito: i nuovi dispositivi
+        <code>src/assets/snapshot.jsonl</code> e pubblica di nuovo il sito: i nuovi dispositivi
         apriranno la biblioteca in pochi secondi, senza scaricare tutto dal Drive.
       </p>
       <button
@@ -41,7 +41,7 @@ import { LookupService, isDocNode } from './lookup.service';
         (click)="library.exportSnapshot()"
         [disabled]="!library.tree() || library.exporting() === 'working'"
       >
-        {{ library.exporting() === 'working' ? 'Preparo il file…' : 'Scarica snapshot.json' }}
+        {{ library.exporting() === 'working' ? 'Preparo il file…' : 'Scarica snapshot.jsonl' }}
       </button>
       @if (library.exportInfo()) {
         <p role="status" [class.error]="library.exporting() === 'error'">{{ library.exportInfo() }}</p>
