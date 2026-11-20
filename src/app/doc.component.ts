@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -67,7 +67,7 @@ function writeStorage(key: string, value: string): void {
           <p class="muted">Caricamento del documento…</p>
         }
 
-        <div class="content" (click)="onClick($event)" [innerHTML]="html()"></div>
+        <div #contentEl class="content" (click)="onClick($event)" [innerHTML]="html()"></div>
       </div>
     </div>
 
@@ -94,6 +94,7 @@ function writeStorage(key: string, value: string): void {
   `,
 })
 export class DocComponent {
+  @ViewChild('contentEl') private contentEl?: ElementRef<HTMLElement>;
   private library = inject(LibraryService);
   private lookup = inject(LookupService);
   private sanitizer = inject(DomSanitizer);
@@ -163,12 +164,50 @@ export class DocComponent {
       // Il contenuto arriva dai tuoi documenti: viene mostrato senza filtri,
       // così restano intatti gli ID, le tabelle e i collegamenti delle formule.
       this.html.set(this.sanitizer.bypassSecurityTrustHtml(raw));
+      setTimeout(() => this.linkNames()); // dopo che Angular ha inserito il testo
       this.scrollToFragment();
     } catch (e: any) {
       this.error.set(e?.message ?? String(e));
       this.html.set('');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /**
+   * Rende cliccabili i nomi di feat, talenti, spell e altre voci del Drive che compaiono nel testo
+   * (anche nel bestiario). Il clic apre la descrizione, come per le formule.
+   */
+  private linkNames(): void {
+    const root = this.contentEl?.nativeElement;
+    const re = this.library.linkPattern();
+    if (!root || !re) return;
+    const test = new RegExp(re.source, 'u');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => {
+        const p = n.parentElement;
+        if (!p || p.closest('h1, h2, h3, h4, h5, h6, a, button, .seed, .formula-detail')) return NodeFilter.FILTER_REJECT;
+        return test.test(n.textContent ?? '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    for (const node of nodes) {
+      // con un gruppo di cattura, split restituisce testo e nomi a turno: i nomi sono nelle posizioni dispari
+      const parts = (node.textContent ?? '').split(re);
+      if (parts.length < 2) continue;
+      const frag = document.createDocumentFragment();
+      parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+          const span = document.createElement('span');
+          span.className = 'seed term-link';
+          span.textContent = part;
+          frag.append(span);
+        } else if (part) {
+          frag.append(part);
+        }
+      });
+      node.replaceWith(frag);
     }
   }
 

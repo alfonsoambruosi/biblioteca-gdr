@@ -278,3 +278,6 @@ h2 { font-size: 1.25rem; }
 .chip.on { background: var(--wax); color: var(--cream); border-color: var(--wax-dark); }
 .chip small { margin-left: 0.35rem; opacity: 0.75; }
 .filter { width: 100%; margin: 0.4rem 0; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: 3px; background: rgb(240 226 186 / 0.75); color: var(--ink); font-size: 16px; }
+
+/* nomi di feat, talenti e spell collegati nei testi: si aprono con un clic */
+.seed.term-link { text-decoration: underline dotted; text-decoration-color: var(--wax); }

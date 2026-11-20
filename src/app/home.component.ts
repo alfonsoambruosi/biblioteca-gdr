@@ -35,9 +35,17 @@ import { LookupService, isDocNode } from './lookup.service';
         <code>src/assets/snapshot.json</code> e pubblica di nuovo il sito: i nuovi dispositivi
         apriranno la biblioteca in pochi secondi, senza scaricare tutto dal Drive.
       </p>
-      <button type="button" class="ghost" (click)="library.exportSnapshot()" [disabled]="!library.tree()">
-        Scarica snapshot.json
+      <button
+        type="button"
+        class="ghost"
+        (click)="library.exportSnapshot()"
+        [disabled]="!library.tree() || library.exporting() === 'working'"
+      >
+        {{ library.exporting() === 'working' ? 'Preparo il file…' : 'Scarica snapshot.json' }}
       </button>
+      @if (library.exportInfo()) {
+        <p role="status" [class.error]="library.exporting() === 'error'">{{ library.exportInfo() }}</p>
+      }
     </details>
 
     @if (looseFiles().length) {

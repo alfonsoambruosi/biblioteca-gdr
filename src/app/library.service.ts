@@ -12,6 +12,12 @@ const STYLE_MAP = [
   "p[style-name='Subtitle'] => h2:fresh",
 ];
 
+/** Titoli troppo comuni per essere collegati automaticamente nei testi. */
+const GENERIC_HEADINGS = new Set([
+  'benefit', 'special', 'prerequisite', 'prerequisites', 'normal', 'table', 'notes', 'note', 'example',
+  'examples', 'contents', 'overview', 'introduction', 'chapter', 'summary', 'description', 'requirements',
+]);
+
 interface IndexDoc {
   id: string; // `${docId}#${sectionId}`
   docId: string;
@@ -172,27 +178,78 @@ export class LibraryService {
     this.version.update(v => v + 1);
   }
 
+  /** Stato dell'esportazione, mostrato nella Home. */
+  readonly exporting = signal<'idle' | 'working' | 'done' | 'error'>('idle');
+  readonly exportInfo = signal('');
+
   /**
-   * Crea il file snapshot.json con tutti i documenti salvati su questo dispositivo.
-   * Va copiato in src/assets/snapshot.json e pubblicato di nuovo: così i nuovi
-   * dispositivi non devono scaricare e convertire tutto dal Drive.
+   * Crea il file snapshot.json con i documenti salvati su questo dispositivo.
+   * Va copiato in src/assets/snapshot.json e pubblicato di nuovo.
    */
   async exportSnapshot(): Promise<void> {
-    const docs: Snapshot['docs'] = {};
-    for (const f of this.files()) {
-      const meta = this.metas.get(f.id);
-      const html = await get<string>(`html:${f.id}`);
-      if (meta && html != null) docs[f.id] = { meta, html };
+    this.exporting.set('working');
+    this.exportInfo.set('Preparo il file…');
+    try {
+      const tree = this.tree();
+      if (!tree) throw new Error('la biblioteca non è ancora caricata.');
+      const files = this.files();
+      const docs: Snapshot['docs'] = {};
+      for (const f of files) {
+        const meta = this.metas.get(f.id);
+        const html = await get<string>(`html:${f.id}`);
+        if (meta && html != null) docs[f.id] = { meta, html };
+      }
+      const exported = Object.keys(docs).length;
+      const missing = files.length - exported;
+      const snap: Snapshot = { generatedAt: new Date().toISOString(), tree, docs };
+      const json = JSON.stringify(snap);
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'snapshot.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      this.exporting.set('done');
+      this.exportInfo.set(
+        `File creato con ${exported} documenti (${(json.length / 1e6).toFixed(1)} MB). ` +
+          (missing ? `${missing} documenti non sono ancora salvati e mancano nel file. ` : '') +
+          'Controlla la cartella Download del browser.'
+      );
+    } catch (e: any) {
+      this.exporting.set('error');
+      this.exportInfo.set('Esportazione non riuscita: ' + (e?.message ?? String(e)));
     }
-    const tree = this.tree();
-    if (!tree) return;
-    const snap: Snapshot = { generatedAt: new Date().toISOString(), tree, docs };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(snap)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'snapshot.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  private linkCache: { v: number; re: RegExp | null } | null = null;
+
+  /**
+   * Espressione che riconosce, dentro i testi, i nomi già presenti nel Drive come
+   * titoli di feat, talenti, spell o altre voci. Serve a rendere cliccabili i nomi.
+   */
+  linkPattern(): RegExp | null {
+    const v = this.version();
+    const cached = this.linkCache;
+    if (cached && cached.v === v) return cached.re;
+    const names = new Set<string>();
+    for (const m of this.metas.values()) {
+      for (const s of m.sections) {
+        const h = s.heading.trim();
+        if (s.level < 3 || h.length < 5 || h.length > 60 || GENERIC_HEADINGS.has(h.toLowerCase())) continue;
+        names.add(h);
+      }
+    }
+    const list = [...names].sort((a, b) => b.length - a.length).slice(0, 4000);
+    const re = list.length
+      ? new RegExp(
+          `(?<![\\p{L}\\p{N}])(${list.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`,
+          'gu'
+        )
+      : null;
+    this.linkCache = { v, re };
+    return re;
   }
 
   private downloadStale(stale: TreeNode[]): Promise<void> {
