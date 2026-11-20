@@ -147,74 +147,83 @@ export class LibraryService {
   }
 
   /**
-   * Carica la copia precompilata (assets/snapshot.jsonll) a pezzi: una riga per documento,
-   * così il file non viene mai letto come un unico testo gigante.
+   * Carica la copia precompilata: i file assets/snapshot-1.jsonl, snapshot-2.jsonl, ...
+   * (uno ogni circa 15 MB). In ogni file c'è una riga per documento; il primo contiene
+   * anche la data della copia e la struttura delle cartelle.
    * Importa solo i documenti che il dispositivo non ha ancora: quelli cambiati
    * vengono poi confrontati con il Drive e riscaricati solo se necessario.
    */
   private async importSnapshot(): Promise<void> {
-    let res: Response;
-    try {
-      res = await fetch('assets/snapshot.jsonll', { cache: 'no-cache' });
-    } catch {
-      return;
-    }
-    if (!res.ok || !res.body) return; // nessuna copia precompilata: si legge dal Drive
-
-    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-    let buf = '';
-    let header: { generatedAt: string; tree: TreeNode } | null = null;
-    let pending: [string, unknown][] = [];
-    let skip = false;
-
+    const st = { generatedAt: '', skip: false };
+    const pending: [string, unknown][] = [];
     const flush = async () => {
-      if (pending.length) await setMany(pending);
-      pending = [];
+      if (pending.length) await setMany(pending.splice(0));
     };
-    const handle = async (line: string) => {
-      if (!line.trim() || skip) return;
-      const obj = JSON.parse(line);
-      if (!header) {
-        header = obj as { generatedAt: string; tree: TreeNode };
-        if (!header.tree) return;
-        if ((await get<string>('snapshotAt')) === header.generatedAt) {
-          skip = true;
+
+    for (let part = 1; part <= 50 && !st.skip; part++) {
+      let res: Response;
+      try {
+        res = await fetch(`assets/snapshot-${part}.jsonl`, { cache: 'no-cache' });
+      } catch {
+        break;
+      }
+      if (!res.ok || !res.body) break; // nessun file con questo numero: fine
+
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = '';
+      let first = true;
+      const handle = async (line: string) => {
+        if (!line.trim() || st.skip) return;
+        const obj = JSON.parse(line);
+        if (first) {
+          first = false;
+          const h = obj as { generatedAt: string; tree?: TreeNode };
+          st.generatedAt = h.generatedAt;
+          if (part === 1) {
+            if ((await get<string>('snapshotAt')) === h.generatedAt) {
+              st.skip = true; // questa copia è già stata caricata
+              return;
+            }
+            if (!this.tree() && h.tree) {
+              this.setTree(h.tree);
+              await set('tree', h.tree);
+            }
+          }
           return;
         }
-        if (!this.tree()) {
-          this.setTree(header.tree);
-          await set('tree', header.tree);
-        }
-        return;
-      }
-      const d = obj as { id: string; meta: DocMeta; html: string };
-      if (this.metas.has(d.id)) return;
-      pending.push([`html:${d.id}`, d.html], [`meta:${d.id}`, d.meta]);
-      this.addToIndex(d.meta);
-      if (pending.length >= 200) await flush();
-    };
+        const d = obj as { id: string; meta: DocMeta; html: string };
+        if (this.metas.has(d.id)) return;
+        pending.push([`html:${d.id}`, d.html], [`meta:${d.id}`, d.meta]);
+        this.addToIndex(d.meta);
+        if (pending.length >= 200) await flush();
+      };
 
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += value;
-        let nl = buf.indexOf('\n');
-        while (nl >= 0) {
-          const line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          await handle(line);
-          if (skip) return;
-          nl = buf.indexOf('\n');
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += value;
+          let nl = buf.indexOf('\n');
+          while (nl >= 0) {
+            const line = buf.slice(0, nl);
+            buf = buf.slice(nl + 1);
+            await handle(line);
+            if (st.skip) break;
+            nl = buf.indexOf('\n');
+          }
+          if (st.skip) {
+            await reader.cancel();
+            break;
+          }
         }
+        if (!st.skip && buf.trim()) await handle(buf);
+      } finally {
+        await flush(); // salva quanto letto, anche se il file si interrompe
       }
-      if (buf.trim()) await handle(buf);
-    } finally {
-      // salva quanto letto, anche se il file si interrompe a metà
-      await flush();
     }
-    if (header && !skip) {
-      await set('snapshotAt', (header as { generatedAt: string }).generatedAt);
+
+    if (st.generatedAt && !st.skip) {
+      await set('snapshotAt', st.generatedAt);
       this.version.update(v => v + 1);
     }
   }
@@ -224,8 +233,8 @@ export class LibraryService {
   readonly exportInfo = signal('');
 
   /**
-   * Crea il file snapshot.jsonl con i documenti salvati su questo dispositivo.
-   * Va copiato in src/assets/snapshot.jsonl e pubblicato di nuovo.
+   * Crea i file snapshot-1.jsonl, snapshot-2.jsonl... con i documenti salvati su questo dispositivo.
+   * Vanno copiati tutti in src/assets/ e pubblicati di nuovo.
    */
   async exportSnapshot(): Promise<void> {
     this.exporting.set('working');
@@ -234,32 +243,49 @@ export class LibraryService {
       const tree = this.tree();
       if (!tree) throw new Error('la biblioteca non è ancora caricata.');
       const files = this.files();
-      // un documento per riga, senza mai creare un unico testo gigante
-      const parts: BlobPart[] = [JSON.stringify({ generatedAt: new Date().toISOString(), tree }) + '\n'];
+      const LIMIT = 15_000_000; // caratteri: sotto i 25 MB che GitHub accetta dal browser
+      const generatedAt = new Date().toISOString();
+      const blobs: Blob[] = [];
+      let current: string[] = [];
+      let size = 0;
+      const header = (n: number) =>
+        JSON.stringify(n === 1 ? { generatedAt, tree } : { generatedAt }) + '\n';
+      current.push(header(1));
+      size = current[0].length;
       let exported = 0;
       for (const f of files) {
         const meta = this.metas.get(f.id);
         const html = await get<string>(`html:${f.id}`);
-        if (meta && html != null) {
-          parts.push(JSON.stringify({ id: f.id, meta, html }) + '\n');
-          exported++;
+        if (!meta || html == null) continue;
+        const line = JSON.stringify({ id: f.id, meta, html }) + '\n';
+        if (size + line.length > LIMIT && current.length > 1) {
+          blobs.push(new Blob(current, { type: 'application/x-ndjson' }));
+          current = [header(blobs.length + 1)];
+          size = current[0].length;
         }
+        current.push(line);
+        size += line.length;
+        exported++;
       }
+      blobs.push(new Blob(current, { type: 'application/x-ndjson' }));
       const missing = files.length - exported;
-      const blob = new Blob(parts, { type: 'application/x-ndjson' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'snapshot.jsonll';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      for (const [i, blob] of blobs.entries()) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `snapshot-${i + 1}.jsonl`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        await new Promise(r => setTimeout(r, 700)); // lascia al browser il tempo di salvare ogni file
+      }
+      const total = blobs.reduce((t, b) => t + b.size, 0);
       this.exporting.set('done');
       this.exportInfo.set(
-        `File creato con ${exported} documenti (${(blob.size / 1e6).toFixed(1)} MB). ` +
+        `Creati ${blobs.length} file con ${exported} documenti (${(total / 1e6).toFixed(1)} MB in totale). ` +
           (missing ? `${missing} documenti non sono ancora salvati e mancano nel file. ` : '') +
-          'Controlla la cartella Download del browser.'
+          'Carica tutti i file in src/assets/. Controlla la cartella Download del browser.'
       );
     } catch (e: any) {
       this.exporting.set('error');

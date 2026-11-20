@@ -65,12 +65,14 @@ La chiave API arriva comunque nel codice del sito, perché l'app gira nel browse
 ## Copia precompilata (caricamento rapido)
 
 Di default ogni nuovo dispositivo scarica e converte tutti i documenti dal Drive al primo accesso.
-Per evitarlo, puoi pubblicare una copia già pronta:
+Per evitarlo, puoi pubblicare una copia già pronta. Se la copia è grande, viene divisa in più file
+da circa 15 MB, perché GitHub accetta al massimo 25 MB per file caricato dal browser.
 
-1. Apri la biblioteca su un computer già aggiornato, vai in Home e apri **Copia per il caricamento rapido**.
-2. Premi **Scarica snapshot.jsonl**.
-3. Copia il file in `src/assets/snapshot.jsonl` del progetto (sostituisci quello eventuale).
-4. Carica le modifiche su GitHub (o rilancia il workflow): il sito pubblicato include la copia.
+1. Apri la biblioteca su un computer già aggiornato, vai in Home, apri **Copia per il caricamento rapido** e premi **Scarica la copia**.
+   Il browser salva uno o più file: `snapshot-1.jsonl`, `snapshot-2.jsonl`, ...
+2. Su GitHub apri `src/assets`, clicca **Add file → Upload files** e carica **tutti** i file `snapshot-N.jsonl`.
+3. Fai il commit come per gli altri file (**Commit directly to the main branch**): il workflow si rilancia da solo.
 
-I dispositivi nuovi scaricano questo file in un'unica richiesta. Poi il login confronta soltanto la struttura del Drive
-e riscarica i soli documenti cambiati. Ripeti i passi 1-4 ogni tanto, quando hai aggiornato molti documenti.
+Quando aggiorni la copia, carica i file nuovi e cancella quelli vecchi che non servono più (es. se prima erano 4 e ora sono 3, elimina il quarto).
+I dispositivi nuovi scaricano questi file in sequenza. Poi il login confronta soltanto la struttura del Drive
+e riscarica i soli documenti cambiati.
