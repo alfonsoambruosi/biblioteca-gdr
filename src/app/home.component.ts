@@ -26,6 +26,10 @@ import { LookupService, isDocNode } from './lookup.service';
         <strong class="card-title"><app-icon [name]="'spell'" />Incantesimi per classe</strong>
         <span class="muted">Liste e livelli</span>
       </a>
+      <a class="card" routerLink="/oggetti">
+        <strong class="card-title"><app-icon [name]="'gem'" />Creazione oggetti magici</strong>
+        <span class="muted">Costo in numen da spell, metamagie e talenti</span>
+      </a>
     </div>
 
     <details class="admin-box">

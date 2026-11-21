@@ -7,6 +7,7 @@ import { FolderComponent } from './folder.component';
 import { DocComponent } from './doc.component';
 import { SearchComponent } from './search.component';
 import { SpellbookComponent } from './spellbook.component';
+import { ItemCalcComponent } from './item-calc.component';
 
 export const routes: Routes = [
   {
@@ -26,6 +27,7 @@ export const routes: Routes = [
       { path: 'doc/:id', component: DocComponent },
       { path: 'cerca', component: SearchComponent },
       { path: 'incantesimi', component: SpellbookComponent },
+      { path: 'oggetti', component: ItemCalcComponent },
     ],
   },
   { path: '**', redirectTo: '' },
