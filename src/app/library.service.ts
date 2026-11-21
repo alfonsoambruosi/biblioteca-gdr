@@ -6,7 +6,7 @@ import { environment } from '../environments/environment';
 import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
 import { DocMeta, SearchHit, Section, TreeNode } from './models';
-import { TermSet, buildTermSet } from './term-links';
+import { TermMap, TermTarget, buildTermMap, namesOf } from './term-links';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -294,27 +294,36 @@ export class LibraryService {
     }
   }
 
-  private linkCache: { v: number; set: TermSet } | null = null;
+  private linkCache: { v: number; terms: TermMap } | null = null;
 
   /**
-   * Nomi che nei testi diventano cliccabili: titoli di feat, talenti, spell e altre voci del Drive.
-   * Nessun limite di quantità: i nomi brevi (es. "Overrun") restano sempre inclusi.
+   * Nomi che nei testi diventano cliccabili (feat, talenti, spell, altre voci del Drive),
+   * ciascuno con il riferimento alla sezione da mostrare. Nessun limite di quantità.
+   * Le voci dei documenti del bestiario vengono dopo quelle del resto della biblioteca.
    */
-  linkTerms(): TermSet {
+  linkTerms(): TermMap {
     const v = this.version();
     const cached = this.linkCache;
-    if (cached && cached.v === v) return cached.set;
-    const names: string[] = [];
-    for (const m of this.metas.values()) {
+    if (cached && cached.v === v) return cached.terms;
+    const full: Array<[string, TermTarget]> = [];
+    const derived: Array<[string, TermTarget]> = [];
+    const metas = [...this.metas.values()].sort((x, y) => Number(this.isBestiary(x.id)) - Number(this.isBestiary(y.id)));
+    for (const m of metas) {
       for (const s of m.sections) {
-        const h = s.heading.trim();
-        if (s.level < 3 || h.length < 5 || h.length > 80 || GENERIC_HEADINGS.has(h.toLowerCase())) continue;
-        names.push(h);
+        if (s.level < 3 || s.heading.trim().length < 5) continue;
+        const ref: TermTarget = { docId: m.id, docName: m.name, anchor: s.id, heading: s.heading, level: s.level };
+        const names = namesOf(s.heading);
+        for (const n of names.full) {
+          if (n.length >= 5 && n.length <= 80 && !GENERIC_HEADINGS.has(n.toLowerCase())) full.push([n, ref]);
+        }
+        for (const n of names.derived) {
+          if (n.length >= 5 && n.length <= 80 && !GENERIC_HEADINGS.has(n.toLowerCase())) derived.push([n, ref]);
+        }
       }
     }
-    const set = buildTermSet(names);
-    this.linkCache = { v, set };
-    return set;
+    const terms = buildTermMap([...full, ...derived]);
+    this.linkCache = { v, terms };
+    return terms;
   }
 
   /** Vero per i documenti che stanno nella cartella Bestiary (o dentro di essa). */

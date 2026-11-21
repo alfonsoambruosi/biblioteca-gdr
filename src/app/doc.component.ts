@@ -7,6 +7,7 @@ import { LibraryService } from './library.service';
 import { LookupService } from './lookup.service';
 import { esc } from './doc-parser';
 import { splitTerms } from './term-links';
+import { EntryRef } from './lookup.service';
 
 const TOC_KEY = 'bgdr-toc';
 const PANEL_KEY = 'bgdr-panel-h';
@@ -182,8 +183,8 @@ export class DocComponent {
   private linkNames(): void {
     const root = this.contentEl?.nativeElement;
     if (!root) return;
-    const set = this.library.linkTerms();
-    if (!set.names.size) return;
+    const terms = this.library.linkTerms();
+    if (!terms.map.size) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: n => {
         const p = n.parentElement;
@@ -194,13 +195,18 @@ export class DocComponent {
     const nodes: Text[] = [];
     while (walker.nextNode()) nodes.push(walker.currentNode as Text);
     for (const node of nodes) {
-      const parts = splitTerms(node.textContent ?? '', set);
-      if (parts.length === 1 && !parts[0].term) continue;
+      const parts = splitTerms(node.textContent ?? '', terms);
+      if (parts.length === 1 && !parts[0].ref) continue;
       const frag = document.createDocumentFragment();
       for (const part of parts) {
-        if (part.term) {
+        if (part.ref) {
           const span = document.createElement('span');
-          span.className = 'seed term-link';
+          span.className = 'term-link';
+          span.dataset['doc'] = part.ref.docId;
+          span.dataset['anchor'] = part.ref.anchor;
+          span.dataset['heading'] = part.ref.heading;
+          span.dataset['docName'] = part.ref.docName;
+          span.dataset['level'] = String(part.ref.level);
           span.textContent = part.text;
           frag.append(span);
         } else {
@@ -219,6 +225,21 @@ export class DocComponent {
 
   async onClick(ev: Event): Promise<void> {
     const t = ev.target as HTMLElement;
+
+    // Clic su un nome collegato (feat, talento, spell): apre la sua sezione.
+    const link = t.closest('.term-link') as HTMLElement | null;
+    if (link) {
+      ev.preventDefault();
+      const d = link.dataset;
+      await this.openEntry({
+        docId: d['doc'] ?? '',
+        docName: d['docName'] ?? '',
+        anchor: d['anchor'] ?? '',
+        heading: d['heading'] ?? '',
+        level: Number(d['level'] ?? 3),
+      });
+      return;
+    }
 
     // Clic su un "seme" (es. Reach Spell): apre il pannello con la sua descrizione.
     const seed = t.closest('.seed') as HTMLElement | null;
@@ -254,6 +275,13 @@ export class DocComponent {
 
   private describe(term: string, base?: string): Promise<string> {
     return base === undefined ? this.lookup.explain(term) : this.lookup.explainSeed(term, Number(base));
+  }
+
+  private async openEntry(ref: EntryRef): Promise<void> {
+    this.panelTitle.set(ref.heading);
+    this.panel.set(this.sanitizer.bypassSecurityTrustHtml('<p class="muted">Caricamento…</p>'));
+    const html = await this.lookup.entryHtml(ref);
+    this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html || '<p class="muted">Voce non trovata.</p>'));
   }
 
   private async openTerm(term: string, base?: string): Promise<void> {
