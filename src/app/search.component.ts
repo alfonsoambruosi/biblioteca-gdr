@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
@@ -39,4 +39,12 @@ export class SearchComponent {
     this.library.version();
     return this.library.search(this.q());
   });
+
+  constructor() {
+    // ogni nuova ricerca parte dall'inizio della pagina, così si vede il primo risultato
+    effect(() => {
+      this.q();
+      window.scrollTo({ top: 0 });
+    });
+  }
 }

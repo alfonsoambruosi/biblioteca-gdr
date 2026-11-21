@@ -10,7 +10,7 @@
  */
 export const environment = {
   driveRootId: '1zyULW02GoZhcXmsVODW0m4jaxsKIcHkB',
-  apiKey: 'AIzaSyDN6spStBWBF_v4h7g14OxH9itXRlDRo3g',
+  apiKey: 'INSERISCI_QUI_LA_TUA_API_KEY',
   mergeGroups: [
     { pattern: /^Ch\.?\s*8a?\b/i, name: 'Ch 8 + 8a - Spells e Spells Grimoire' },
   ] as { pattern: RegExp; name: string }[],

@@ -6,6 +6,7 @@ import { environment } from '../environments/environment';
 import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
 import { DocMeta, SearchHit, Section, TreeNode } from './models';
+import { TermSet, buildTermSet } from './term-links';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -293,33 +294,32 @@ export class LibraryService {
     }
   }
 
-  private linkCache: { v: number; re: RegExp | null } | null = null;
+  private linkCache: { v: number; set: TermSet } | null = null;
 
   /**
-   * Espressione che riconosce, dentro i testi, i nomi già presenti nel Drive come
-   * titoli di feat, talenti, spell o altre voci. Serve a rendere cliccabili i nomi.
+   * Nomi che nei testi diventano cliccabili: titoli di feat, talenti, spell e altre voci del Drive.
+   * Nessun limite di quantità: i nomi brevi (es. "Overrun") restano sempre inclusi.
    */
-  linkPattern(): RegExp | null {
+  linkTerms(): TermSet {
     const v = this.version();
     const cached = this.linkCache;
-    if (cached && cached.v === v) return cached.re;
-    const names = new Set<string>();
+    if (cached && cached.v === v) return cached.set;
+    const names: string[] = [];
     for (const m of this.metas.values()) {
       for (const s of m.sections) {
         const h = s.heading.trim();
-        if (s.level < 3 || h.length < 5 || h.length > 60 || GENERIC_HEADINGS.has(h.toLowerCase())) continue;
-        names.add(h);
+        if (s.level < 3 || h.length < 5 || h.length > 80 || GENERIC_HEADINGS.has(h.toLowerCase())) continue;
+        names.push(h);
       }
     }
-    const list = [...names].sort((a, b) => b.length - a.length).slice(0, 4000);
-    const re = list.length
-      ? new RegExp(
-          `(?<![\\p{L}\\p{N}])(${list.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`,
-          'gu'
-        )
-      : null;
-    this.linkCache = { v, re };
-    return re;
+    const set = buildTermSet(names);
+    this.linkCache = { v, set };
+    return set;
+  }
+
+  /** Vero per i documenti che stanno nella cartella Bestiary (o dentro di essa). */
+  isBestiary(id: string): boolean {
+    return this.pathOf(id).some(n => /bestiar|bestiary/i.test(n.name));
   }
 
   private downloadStale(stale: TreeNode[]): Promise<void> {
@@ -551,7 +551,7 @@ export class LibraryService {
    * 2) titoli che iniziano con la ricerca;
    * 3) tutto il resto che contiene le parole, dal più pertinente.
    */
-  search(query: string, limit = 150): SearchHit[] {
+  search(query: string, limit = 150, scope: 'all' | 'bestiary' = 'all'): SearchHit[] {
     const q = query.trim();
     if (!q) return [];
     const phrase = /^"(.+)"$/.exec(q)?.[1];
@@ -564,6 +564,16 @@ export class LibraryService {
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
+    };
+    // "all" esclude sempre il bestiario; "bestiary" cerca solo lì
+    const scopeCache = new Map<string, boolean>();
+    const inScope = (id: string): boolean => {
+      let ok = scopeCache.get(id);
+      if (ok === undefined) {
+        ok = this.isBestiary(id) === (scope === 'bestiary');
+        scopeCache.set(id, ok);
+      }
+      return ok;
     };
     const make = (m: DocMeta, s: Section): SearchHit => ({
       docId: m.id,
@@ -581,7 +591,7 @@ export class LibraryService {
         for (const s of m.sections) {
           const h = normTerm(s.heading);
           if (!h || (h !== key && !h.startsWith(key))) continue;
-          if (!first(m.id, s.id)) continue;
+          if (!inScope(m.id) || !first(m.id, s.id)) continue;
           if (h === key) exact.push({ hit: make(m, s), level: s.level });
           else starts.push(make(m, s));
         }
@@ -594,7 +604,7 @@ export class LibraryService {
     for (const r of res) {
       const m = this.metas.get(r['docId']);
       const sec = m?.sections.find(s => s.id === r['anchor']);
-      if (!m || !sec || !first(m.id, sec.id)) continue;
+      if (!m || !sec || !inScope(m.id) || !first(m.id, sec.id)) continue;
       if (phrase && !(sec.heading + ' ' + sec.text).toLowerCase().includes(phrase.toLowerCase())) continue;
       rest.push(make(m, sec));
     }

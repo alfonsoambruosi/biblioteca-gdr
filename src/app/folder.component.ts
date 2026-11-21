@@ -5,10 +5,11 @@ import { map } from 'rxjs';
 import { IconComponent, iconFor } from './icon.component';
 import { LibraryService } from './library.service';
 import { LookupService, isDocNode } from './lookup.service';
+import { BestiarySearchComponent } from './bestiary-search.component';
 
 @Component({
   selector: 'app-folder',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, BestiarySearchComponent],
   template: `
     <nav class="crumbs" aria-label="Percorso">
       <a routerLink="/">Home</a>
@@ -20,6 +21,10 @@ import { LookupService, isDocNode } from './lookup.service';
 
     @if (folder(); as f) {
       <h1 class="card-title"><app-icon [name]="icon(f.name)" />{{ f.name }}</h1>
+
+      @if (inBestiary()) {
+        <app-bestiary-search />
+      }
 
       @if (folders().length) {
         <div class="cards">
@@ -65,6 +70,11 @@ export class FolderComponent {
   readonly crumbs = computed(() => {
     this.library.tree();
     return this.library.pathOf(this.id());
+  });
+
+  readonly inBestiary = computed(() => {
+    this.library.tree();
+    return this.library.isBestiary(this.id());
   });
 
   readonly folders = computed(() =>

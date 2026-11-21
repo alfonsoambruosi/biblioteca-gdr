@@ -6,6 +6,7 @@ import { map } from 'rxjs';
 import { LibraryService } from './library.service';
 import { LookupService } from './lookup.service';
 import { esc } from './doc-parser';
+import { splitTerms } from './term-links';
 
 const TOC_KEY = 'bgdr-toc';
 const PANEL_KEY = 'bgdr-panel-h';
@@ -180,33 +181,32 @@ export class DocComponent {
    */
   private linkNames(): void {
     const root = this.contentEl?.nativeElement;
-    const re = this.library.linkPattern();
-    if (!root || !re) return;
-    const test = new RegExp(re.source, 'u');
+    if (!root) return;
+    const set = this.library.linkTerms();
+    if (!set.names.size) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: n => {
         const p = n.parentElement;
         if (!p || p.closest('h1, h2, h3, h4, h5, h6, a, button, .seed, .formula-detail')) return NodeFilter.FILTER_REJECT;
-        return test.test(n.textContent ?? '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        return (n.textContent ?? '').length > 2 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       },
     });
     const nodes: Text[] = [];
     while (walker.nextNode()) nodes.push(walker.currentNode as Text);
     for (const node of nodes) {
-      // con un gruppo di cattura, split restituisce testo e nomi a turno: i nomi sono nelle posizioni dispari
-      const parts = (node.textContent ?? '').split(re);
-      if (parts.length < 2) continue;
+      const parts = splitTerms(node.textContent ?? '', set);
+      if (parts.length === 1 && !parts[0].term) continue;
       const frag = document.createDocumentFragment();
-      parts.forEach((part, i) => {
-        if (i % 2 === 1) {
+      for (const part of parts) {
+        if (part.term) {
           const span = document.createElement('span');
           span.className = 'seed term-link';
-          span.textContent = part;
+          span.textContent = part.text;
           frag.append(span);
-        } else if (part) {
-          frag.append(part);
+        } else {
+          frag.append(part.text);
         }
-      });
+      }
       node.replaceWith(frag);
     }
   }

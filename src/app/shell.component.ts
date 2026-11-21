@@ -70,6 +70,7 @@ export class ShellComponent {
   go(): void {
     const q = this.query.trim();
     if (!q) return;
+    window.scrollTo({ top: 0 });
     void this.router.navigate(['/cerca'], { queryParams: { q } });
   }
 
