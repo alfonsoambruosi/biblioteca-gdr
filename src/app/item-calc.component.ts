@@ -14,7 +14,7 @@ interface SpellOption {
 
 interface EntryOption {
   name: string;
-  ref: TermTarget;
+  ref: TermTarget | null;
   adj: number | null;
   note: string;
 }
@@ -23,9 +23,29 @@ const KINDS: { value: ModKind; label: string }[] = [
   { value: 'metamagia', label: 'Metamagia' },
   { value: 'talento', label: 'Talento' },
   { value: 'abilita', label: 'Potenziamento abilità' },
+  { value: 'proprieta', label: 'Proprietà (armi e materiali)' },
 ];
 
-const stripTag = (h: string) => h.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+const CATEGORIES = [
+  { value: 'tutti', label: 'Tutti' },
+  { value: 'magico', label: 'Oggetti magici e armi (numen)' },
+  { value: 'alchimia', label: 'Alchimia e veleni (gp a dose)' },
+  { value: 'munizione', label: 'Frecce e dardi (numen a pezzo)' },
+];
+
+/** Pulisce il titolo di una voci della biblioteca: via i tag [..] e il codice fonte in fondo. */
+function cleanName(heading: string): string {
+  return heading
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/(?<=[a-z])[A-Z][A-Za-z0-9,&\-]*\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Chiave di confronto: parole di almeno 3 lettere, in ordine alfabetico ("Lingering Evocation" = "Evocation, Lingering"). */
+function tokenKey(name: string): string {
+  return (name.toLowerCase().match(/[a-zà-ú]{3,}/g) ?? []).sort().join(' ');
+}
 
 @Component({
   selector: 'app-item-calc',
@@ -34,20 +54,33 @@ const stripTag = (h: string) => h.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
     <nav class="crumbs"><a routerLink="/">Home</a> <span>›</span> <span>Creazione oggetti magici</span></nav>
     <h1>Creazione oggetti magici</h1>
     <p class="muted">
-      Parti da una spell base, aggiungi metamagie, talenti o potenziamenti di abilità e calcola il costo in numen.
+      Parti da una spell base, aggiungi metamagie, talenti, potenziamenti o proprietà e calcola il costo.
+      Oggetti magici e armi costano in numen; alchimia e veleni costano in gp per dose, con la scorta privata in numen.
       Ogni variazione si può includere o escludere, e il valore si può modificare.
     </p>
 
     <section class="calc-block">
       <h2>0. Oggetto del Compendio (facoltativo)</h2>
-      <p class="muted small">Precarica spell base, variazioni, CL, prezzo e durata di un oggetto del compendio. Poi puoi modificare tutto.</p>
-      <select class="picker" size="6" aria-label="Oggetto del compendio" (change)="loadPreset($any($event.target).value)">
-        @for (p of presets; track $index) {
-          <option [value]="$index">{{ p.name }}</option>
+      <p class="muted small">Precarica spell base, variazioni, CL, prezzo e unità di un oggetto del Compendio. Poi puoi modificare tutto.</p>
+      <div class="pick-row">
+        <select aria-label="Categoria" (change)="presetCat.set($any($event.target).value)">
+          @for (c of categories; track c.value) {
+            <option [value]="c.value" [selected]="presetCat() === c.value">{{ c.label }}</option>
+          }
+        </select>
+        <input class="filter" type="search" placeholder="Cerca oggetto…" aria-label="Cerca oggetto del compendio"
+          [value]="presetQ()" (input)="presetQ.set($any($event.target).value)" />
+      </div>
+      <select class="picker" size="8" aria-label="Oggetto del compendio" (change)="loadPreset($any($event.target).value)">
+        @for (o of presetOptions(); track o.i) {
+          <option [value]="o.i">{{ o.p.name }} · {{ o.p.unit === 'gp' ? 'gp a dose' : 'numen' }}</option>
         }
       </select>
       @if (presetTotal() !== null) {
-        <p class="muted small">Totale indicato nel Compendio: {{ presetTotal()!.toLocaleString('it-IT') }} numen</p>
+        <p class="muted small">
+          Totale stampato nel Compendio: {{ fmt(presetTotal()) }} {{ presetUnit() === 'gp' ? 'gp a dose' : 'numen' }}
+          @if (presetStock() !== null) { · scorta privata: {{ fmt(presetStock()) }} numen }
+        </p>
       }
     </section>
 
@@ -120,10 +153,16 @@ const stripTag = (h: string) => h.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
     <section class="calc-block">
       <h2>3. Parametri</h2>
       <div class="pick-row">
+        <label>Prezzo in
+          <select aria-label="Unità del prezzo" (change)="setUnit($any($event.target).value)">
+            <option value="numen" [selected]="unit() === 'numen'">numen (oggetti, armi, munizioni)</option>
+            <option value="gp" [selected]="unit() === 'gp'">gp a dose (alchimia e veleni)</option>
+          </select>
+        </label>
         <label>Livello incantatore (CL)
           <input class="num" type="number" min="1" [value]="cl()" (input)="cl.set(+$any($event.target).value || 1)" />
         </label>
-        <label>Prezzo base (numen)
+        <label>Prezzo base ({{ unit() === 'gp' ? 'gp' : 'numen' }})
           <input class="num" type="number" min="0" [value]="price()" (input)="price.set(+$any($event.target).value || 0)" />
         </label>
         <label>Moltiplicatore durata/uso (×)
@@ -131,7 +170,9 @@ const stripTag = (h: string) => h.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
             (input)="multiplier.set(+$any($event.target).value || 0)" />
         </label>
       </div>
-      <p class="muted small">500 numen è il prezzo per uso attivato; cambialo se l'oggetto usa un'altra tariffa.</p>
+      <p class="muted small">
+        Numen: 500 per uso attivato. Alchimia: 50 gp per livello × CL. La scorta privata costa 18 volte i gp in numen.
+      </p>
     </section>
 
     <section class="calc-block result" aria-live="polite">
@@ -139,7 +180,17 @@ const stripTag = (h: string) => h.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
       @if (base()) {
         <p>Livello finale: <strong>{{ result().level }}</strong></p>
         <p class="formula">{{ result().formula }}</p>
-        <p class="total">{{ totalText() }} numen</p>
+        @if (unit() === 'gp') {
+          <p class="total">{{ fmt(result().total) }} gp a dose</p>
+          <p class="total">Scorta privata: {{ fmt(result().stockNumen) }} numen</p>
+        } @else {
+          <p class="total">{{ fmt(result().total) }} numen</p>
+        }
+        @if (presetTotal() !== null) {
+          <p class="muted small">
+            {{ matchesPreset() ? 'Coincide con il totale del Compendio.' : 'Non coincide con il Compendio: hai modificato livelli, CL, prezzo o variazioni.' }}
+          </p>
+        }
       } @else {
         <p class="muted">Scegli una spell base per calcolare il costo.</p>
       }
@@ -151,8 +202,13 @@ export class ItemCalcComponent {
   private lookup = inject(LookupService);
 
   readonly kinds = KINDS;
-  readonly presets = ITEM_PRESETS;
+  readonly categories = CATEGORIES;
+
+  readonly presetCat = signal('tutti');
+  readonly presetQ = signal('');
   readonly presetTotal = signal<number | null>(null);
+  readonly presetUnit = signal<'numen' | 'gp'>('numen');
+  readonly presetStock = signal<number | null>(null);
 
   readonly spellQ = signal('');
   readonly base = signal<SpellOption | null>(null);
@@ -161,9 +217,19 @@ export class ItemCalcComponent {
   readonly mods = signal<Modifier[]>([]);
   readonly manualName = signal('');
   readonly manualAdj = signal(1);
+  readonly unit = signal<'numen' | 'gp'>('numen');
   readonly cl = signal(1);
   readonly price = signal(500);
   readonly multiplier = signal(1);
+
+  /** Oggetti del Compendio filtrati per categoria e testo; value = indice in ITEM_PRESETS. */
+  readonly presetOptions = computed(() => {
+    const cat = this.presetCat();
+    const q = this.presetQ().trim().toLowerCase();
+    return ITEM_PRESETS.map((p, i) => ({ p, i }))
+      .filter(o => (cat === 'tutti' || o.p.category === cat) && (!q || o.p.name.toLowerCase().includes(q)))
+      .slice(0, 500);
+  });
 
   /** Spell arcane (Mago): tutte, con il livello più basso in cui compaiono. */
   readonly spells = computed<SpellOption[]>(() => {
@@ -185,26 +251,40 @@ export class ItemCalcComponent {
     return this.spells().filter(s => !q || s.name.toLowerCase().includes(q)).slice(0, 400);
   });
 
-  /** Variazioni disponibili per il tipo scelto, dalla biblioteca. */
+  /**
+   * Variazioni disponibili per tipo: dalla biblioteca (metamagie con qualsiasi tag [..Metamagic..],
+   * talenti, potenziamenti) e dai componenti del Compendio che la biblioteca non ha come voce.
+   */
   private readonly allOptions = computed<Record<ModKind, EntryOption[]>>(() => {
     this.library.version();
-    const out: Record<ModKind, EntryOption[]> = { metamagia: [], talento: [], abilita: [], manuale: [] };
+    const out: Record<ModKind, EntryOption[]> = { metamagia: [], talento: [], abilita: [], proprieta: [], manuale: [] };
     for (const m of this.library.allMetas()) {
       for (const s of m.sections) {
         if (s.level < 3 || !s.heading) continue;
         const ref: TermTarget = { docId: m.id, docName: m.name, anchor: s.id, heading: s.heading, level: s.level };
         const adj = levelAdjFromText(s.text);
         const note = adj !== null ? 'suggerito dal testo' : '';
-        if (/Ch 8/i.test(m.name) && /\[Metamagic\]/i.test(s.heading)) {
-          out.metamagia.push({ name: stripTag(s.heading), ref, adj, note });
+        if (/Ch 8/i.test(m.name) && /\[[^\]]*\bMetamagic\b[^\]]*\]/i.test(s.heading)) {
+          out.metamagia.push({ name: cleanName(s.heading), ref, adj, note });
         } else if (/Feat/i.test(m.name)) {
-          out.talento.push({ name: stripTag(s.heading), ref, adj, note });
+          out.talento.push({ name: cleanName(s.heading), ref, adj, note });
         } else if (/Skill/i.test(m.name)) {
-          out.abilita.push({ name: stripTag(s.heading), ref, adj, note });
+          out.abilita.push({ name: cleanName(s.heading), ref, adj, note });
         }
       }
     }
-    for (const k of ['metamagia', 'talento', 'abilita'] as const) {
+    // componenti del Compendio assenti dalla biblioteca
+    const known = new Set(out.metamagia.map(o => tokenKey(o.name)));
+    for (const p of ITEM_PRESETS) {
+      for (const m of p.mods) {
+        const k = tokenKey(m.name);
+        if (!k || known.has(k)) continue;
+        known.add(k);
+        const target: ModKind = /\bSpell\b|Evocation/i.test(m.name) ? 'metamagia' : 'proprieta';
+        out[target].push({ name: m.name, ref: null, adj: null, note: 'dal Compendio' });
+      }
+    }
+    for (const k of ['metamagia', 'talento', 'abilita', 'proprieta'] as const) {
       out[k].sort((a, b) => a.name.localeCompare(b.name, 'it'));
     }
     return out;
@@ -223,10 +303,18 @@ export class ItemCalcComponent {
       price: this.price(),
       multiplier: this.multiplier(),
       mods: this.mods(),
+      unit: this.unit(),
     });
   });
 
-  readonly totalText = computed(() => this.result().total.toLocaleString('it-IT'));
+  readonly matchesPreset = computed(() => {
+    const p = this.presetTotal();
+    return p !== null && Math.abs(this.result().total - p) < 0.5;
+  });
+
+  fmt(n: number | null): string {
+    return n === null ? '' : Math.round(n).toLocaleString('it-IT');
+  }
 
   kindLabel(k: ModKind): string {
     return KINDS.find(x => x.value === k)?.label ?? 'Manuale';
@@ -236,18 +324,33 @@ export class ItemCalcComponent {
     this.base.set(this.spells().find(s => s.key === key) ?? null);
   }
 
+  setUnit(value: string): void {
+    const u = value === 'gp' ? 'gp' : 'numen';
+    this.unit.set(u);
+    this.price.set(u === 'gp' ? 50 : 500);
+  }
+
   loadPreset(index: string): void {
-    const p: ItemPreset | undefined = this.presets[Number(index)];
+    const p: ItemPreset | undefined = ITEM_PRESETS[Number(index)];
     if (!p) return;
     const found = this.spells().find(s => s.name.toLowerCase() === p.base.name.toLowerCase());
     this.base.set(found ?? { key: p.base.name, name: p.base.name, level: p.base.level });
     this.mods.set(
-      p.mods.map(m => ({ kind: 'manuale' as const, name: m.name, adj: m.adj, on: !p.excluded.includes(m.name), source: 'biblioteca' as const })),
+      p.mods.map(m => ({
+        kind: 'manuale' as const,
+        name: m.name,
+        adj: m.adj,
+        on: !p.excluded.includes(m.name),
+        source: 'biblioteca' as const,
+      })),
     );
+    this.unit.set(p.unit);
     this.cl.set(p.cl);
     this.price.set(p.price);
     this.multiplier.set(p.multiplier);
     this.presetTotal.set(p.total);
+    this.presetUnit.set(p.unit);
+    this.presetStock.set(p.stock);
   }
 
   addMod(index: string): void {
