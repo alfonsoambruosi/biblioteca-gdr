@@ -5,6 +5,7 @@ import { LookupService } from './lookup.service';
 import { TermTarget } from './term-links';
 import { ModKind, Modifier, calcItem, levelAdjFromText } from './item-calc';
 import { ITEM_PRESETS, ItemPreset } from './item-presets';
+import { COMPOSITE_ITEMS, CompositeItem, CompositePart } from './item-composite';
 
 interface SpellOption {
   key: string;
@@ -195,6 +196,41 @@ function tokenKey(name: string): string {
         <p class="muted">Scegli una spell base per calcolare il costo.</p>
       }
     </section>
+
+    <section class="calc-block">
+      <h2>4. Oggetti composti (più parti)</h2>
+      <p class="muted small">
+        Oggetti costruiti con più parti, ognuna con il suo costo. Il totale è la somma delle parti incluse.
+        Dove il libro stampa un totale diverso dalla somma, lo segnalo: non correggo il libro.
+      </p>
+      <select class="picker" size="8" aria-label="Oggetto composto" (change)="pickComposite($any($event.target).value)">
+        @for (c of composites; track $index) {
+          <option [value]="$index">{{ c.name }} · {{ c.unit === 'gp' ? 'gp' : 'numen' }}</option>
+        }
+      </select>
+      @if (composite(); as c) {
+        <ul class="mods">
+          @for (p of c.parts; track $index) {
+            <li>
+              <label><input type="checkbox" [checked]="partOn()[$index]" (change)="togglePart($index)" /> conta</label>
+              <strong>{{ p.label }}</strong>
+              <small class="muted">{{ p.kind === 'fixed' ? 'valore del libro' : 'formula' }}</small>
+              <span>{{ fmt(partValue(p)) }} {{ unitLabel(c.unit) }}</span>
+            </li>
+          }
+        </ul>
+        <p class="total">Somma delle parti incluse: {{ fmt(compositeSum()) }} {{ unitLabel(c.unit) }}</p>
+        <p class="muted small">Totale stampato nel libro: {{ fmt(c.stated) }} {{ unitLabel(c.unit) }}</p>
+        @if (compositeMatches()) {
+          <p class="muted small">Coincide con il libro.</p>
+        } @else {
+          <p class="small">Non coincide: il libro stampa {{ fmt(c.stated) }}, le parti incluse danno {{ fmt(compositeSum()) }}.</p>
+        }
+        @if (c.note) { <p class="muted small">{{ c.note }}</p> }
+      } @else {
+        <p class="muted">Scegli un oggetto composto dalla lista.</p>
+      }
+    </section>
   `,
 })
 export class ItemCalcComponent {
@@ -307,6 +343,22 @@ export class ItemCalcComponent {
     });
   });
 
+  readonly composites = COMPOSITE_ITEMS;
+  readonly composite = signal<CompositeItem | null>(null);
+  readonly partOn = signal<boolean[]>([]);
+
+  readonly compositeSum = computed(() => {
+    const c = this.composite();
+    if (!c) return 0;
+    const on = this.partOn();
+    return c.parts.reduce((t, p, i) => t + (on[i] ? this.partValue(p) : 0), 0);
+  });
+
+  readonly compositeMatches = computed(() => {
+    const c = this.composite();
+    return !!c && Math.abs(this.compositeSum() - c.stated) < 0.5;
+  });
+
   readonly matchesPreset = computed(() => {
     const p = this.presetTotal();
     return p !== null && Math.abs(this.result().total - p) < 0.5;
@@ -318,6 +370,24 @@ export class ItemCalcComponent {
 
   kindLabel(k: ModKind): string {
     return KINDS.find(x => x.value === k)?.label ?? 'Manuale';
+  }
+
+  unitLabel(u: 'numen' | 'gp'): string {
+    return u === 'gp' ? 'gp' : 'numen';
+  }
+
+  partValue(p: CompositePart): number {
+    return p.kind === 'fixed' ? p.total : p.level * p.cl * p.price * p.mult;
+  }
+
+  pickComposite(index: string): void {
+    const c = COMPOSITE_ITEMS[Number(index)] ?? null;
+    this.composite.set(c);
+    this.partOn.set(c ? c.parts.map(() => true) : []);
+  }
+
+  togglePart(i: number): void {
+    this.partOn.update(list => list.map((v, j) => (j === i ? !v : v)));
   }
 
   pickBase(key: string): void {
