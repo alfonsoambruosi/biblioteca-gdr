@@ -1,7 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { get, getMany, set, setMany, del } from 'idb-keyval';
 import MiniSearch, { AsPlainObject, Options } from 'minisearch';
-import * as mammoth from 'mammoth/mammoth.browser';
 import { environment } from '../environments/environment';
 import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
@@ -623,7 +622,10 @@ export class LibraryService {
   /** Scarica un file e lo converte in HTML grezzo. */
   private async fetchHtml(part: TreeNode): Promise<string> {
     if (part.kind === 'text') return `<pre class="plain">${esc(await this.drive.downloadText(part))}</pre>`;
-    const buf = await this.drive.downloadBinary(part);
+    const [buf, mammoth] = await Promise.all([
+      this.drive.downloadBinary(part),
+      import('mammoth/mammoth.browser'),
+    ]);
     return (await mammoth.convertToHtml({ arrayBuffer: buf }, { styleMap: STYLE_MAP })).value;
   }
 

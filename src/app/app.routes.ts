@@ -1,18 +1,12 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './auth.guard';
-import { LoginComponent } from './login.component';
 import { ShellComponent } from './shell.component';
 import { HomeComponent } from './home.component';
-import { FolderComponent } from './folder.component';
-import { DocComponent } from './doc.component';
-import { SearchComponent } from './search.component';
-import { SpellbookComponent } from './spellbook.component';
-import { ItemCalcComponent } from './item-calc.component';
 
 export const routes: Routes = [
   {
     path: 'accesso',
-    component: LoginComponent,
+    loadComponent: () => import('./login.component').then(m => m.LoginComponent),
     canActivate: [guestGuard],
     title: 'Accesso · Biblioteca GDR',
   },
@@ -23,11 +17,11 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', component: HomeComponent },
-      { path: 'cartella/:id', component: FolderComponent },
-      { path: 'doc/:id', component: DocComponent },
-      { path: 'cerca', component: SearchComponent },
-      { path: 'incantesimi', component: SpellbookComponent },
-      { path: 'oggetti', component: ItemCalcComponent },
+      { path: 'cartella/:id', loadComponent: () => import('./folder.component').then(m => m.FolderComponent) },
+      { path: 'doc/:id', loadComponent: () => import('./doc.component').then(m => m.DocComponent) },
+      { path: 'cerca', loadComponent: () => import('./search.component').then(m => m.SearchComponent) },
+      { path: 'incantesimi', loadComponent: () => import('./spellbook.component').then(m => m.SpellbookComponent) },
+      { path: 'oggetti', loadComponent: () => import('./item-calc.component').then(m => m.ItemCalcComponent) },
     ],
   },
   { path: '**', redirectTo: '' },
