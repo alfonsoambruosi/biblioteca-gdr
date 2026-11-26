@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from './icon.component';
 import { LibraryService } from './library.service';
@@ -45,7 +45,7 @@ function label(key: string): string {
       type="search"
       placeholder="Filtra per nome…"
       aria-label="Filtra per nome"
-      (input)="filter.set($any($event.target).value)"
+      (input)="onFilter($any($event.target).value)"
     />
 
     <ul class="list">
@@ -67,6 +67,27 @@ function label(key: string): string {
 export class SpellbookComponent {
   private library = inject(LibraryService);
   private lookup = inject(LookupService);
+  private destroyRef = inject(DestroyRef);
+  private filterTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.filterTimer !== null) clearTimeout(this.filterTimer);
+    });
+  }
+
+  onFilter(value: string): void {
+    if (this.filterTimer !== null) clearTimeout(this.filterTimer);
+    if (!value.trim()) {
+      this.filterTimer = null;
+      this.filter.set('');
+      return;
+    }
+    this.filterTimer = setTimeout(() => {
+      this.filterTimer = null;
+      this.filter.set(value);
+    }, 120);
+  }
 
   /** Liste dal Drive, più quelle aggiuntive: Mago (tutte le arcane + Mano d'Ombra) e Ladro. */
   readonly book = computed(() => {

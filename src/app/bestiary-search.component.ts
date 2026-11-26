@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LibraryService } from './library.service';
 
@@ -13,8 +13,7 @@ import { LibraryService } from './library.service';
         class="filter"
         placeholder="Cerca solo nel bestiario…"
         aria-label="Cerca nel bestiario"
-        [value]="query()"
-        (input)="query.set($any($event.target).value)"
+        (input)="onInput($any($event.target).value)"
       />
     </div>
 
@@ -34,7 +33,28 @@ import { LibraryService } from './library.service';
 })
 export class BestiarySearchComponent {
   private library = inject(LibraryService);
+  private destroyRef = inject(DestroyRef);
+  private timer: ReturnType<typeof setTimeout> | null = null;
   readonly query = signal('');
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.timer !== null) clearTimeout(this.timer);
+    });
+  }
+
+  onInput(value: string): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    if (!value.trim()) {
+      this.timer = null;
+      this.query.set('');
+      return;
+    }
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.query.set(value);
+    }, 150);
+  }
 
   readonly hits = computed(() => {
     this.library.version();

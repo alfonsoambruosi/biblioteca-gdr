@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LibraryService } from './library.service';
 import { LookupService } from './lookup.service';
@@ -70,7 +70,7 @@ function tokenKey(name: string): string {
           }
         </select>
         <input class="filter" type="search" placeholder="Cerca oggetto…" aria-label="Cerca oggetto del compendio"
-          [value]="presetQ()" (input)="presetQ.set($any($event.target).value)" />
+          (input)="debounce('preset', presetQ, $any($event.target).value)" />
       </div>
       <select class="picker" size="8" aria-label="Oggetto del compendio" (change)="loadPreset($any($event.target).value)">
         @for (o of presetOptions(); track o.i) {
@@ -88,7 +88,7 @@ function tokenKey(name: string): string {
     <section class="calc-block">
       <h2>1. Spell base</h2>
       <input class="filter" type="search" placeholder="Cerca una spell…" aria-label="Cerca spell"
-        [value]="spellQ()" (input)="spellQ.set($any($event.target).value)" />
+        (input)="debounce('spell', spellQ, $any($event.target).value)" />
       <select class="picker" size="8" aria-label="Spell base" (change)="pickBase($any($event.target).value)">
         @for (s of spellOptions(); track s.key) {
           <option [value]="s.key" [selected]="base()?.key === s.key">{{ s.name }} · livello {{ s.level }}</option>
@@ -110,7 +110,7 @@ function tokenKey(name: string): string {
           }
         </select>
         <input class="filter" type="search" placeholder="Cerca…" aria-label="Cerca variazione"
-          [value]="modQ()" (input)="modQ.set($any($event.target).value)" />
+          (input)="debounce('mod', modQ, $any($event.target).value)" />
       </div>
       <select class="picker" size="8" aria-label="Scegli variazione" (change)="addMod($any($event.target).value)">
         @for (o of modOptions(); track $index) {
@@ -236,6 +236,32 @@ function tokenKey(name: string): string {
 export class ItemCalcComponent {
   private library = inject(LibraryService);
   private lookup = inject(LookupService);
+  private destroyRef = inject(DestroyRef);
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      for (const t of this.timers.values()) clearTimeout(t);
+      this.timers.clear();
+    });
+  }
+
+  debounce(key: string, target: { set(v: string): void }, value: string): void {
+    const prev = this.timers.get(key);
+    if (prev !== undefined) clearTimeout(prev);
+    if (!value.trim()) {
+      this.timers.delete(key);
+      target.set('');
+      return;
+    }
+    this.timers.set(
+      key,
+      setTimeout(() => {
+        this.timers.delete(key);
+        target.set(value);
+      }, 120)
+    );
+  }
 
   readonly kinds = KINDS;
   readonly categories = CATEGORIES;

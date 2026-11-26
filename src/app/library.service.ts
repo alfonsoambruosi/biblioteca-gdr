@@ -61,10 +61,15 @@ export class LibraryService {
   readonly configured = this.drive.configured;
 
   private metas = new Map<string, DocMeta>();
+  private sectionMaps = new Map<string, Map<string, Section>>();
   private nodes = new Map<string, TreeNode>();
   private parents = new Map<string, string>();
   private indexedIds = new Map<string, string[]>();
   private inflight = new Map<string, Promise<void>>();
+  private headingCache: {
+    v: number;
+    entries: Array<{ m: DocMeta; s: Section; norm: string; bestiary: boolean }>;
+  } | null = null;
   private ms = this.newIndex();
   private cachePromise: Promise<void> | null = null;
   private running: Promise<void> | null = null;
@@ -158,7 +163,7 @@ export class LibraryService {
         try {
           this.ms = await MiniSearch.loadJSAsync<IndexDoc>(savedIndex.data, MINISEARCH_OPTIONS);
           for (const m of metas) {
-            this.metas.set(m.id, m);
+            this.storeMeta(m);
             this.indexedIds.set(
               m.id,
               m.sections.map(s => `${m.id}#${s.id}`)
@@ -178,7 +183,7 @@ export class LibraryService {
             ids.push(id);
             allDocs.push({ id, docId: m.id, anchor: s.id, heading: s.heading, text: s.text });
           }
-          this.metas.set(m.id, m);
+          this.storeMeta(m);
           this.indexedIds.set(m.id, ids);
         }
         this.ms.addAll(allDocs);
@@ -511,6 +516,13 @@ export class LibraryService {
 
   // ---------------------------------------------------------------- cache
 
+  private storeMeta(m: DocMeta): void {
+    this.metas.set(m.id, m);
+    const byId = new Map<string, Section>();
+    for (const s of m.sections) byId.set(s.id, s);
+    this.sectionMaps.set(m.id, byId);
+  }
+
   private addToIndex(m: DocMeta, persist = true): void {
     const old = this.indexedIds.get(m.id);
     if (old) {
@@ -531,7 +543,7 @@ export class LibraryService {
     }));
     this.ms.addAll(docs);
     this.indexedIds.set(m.id, docs.map(d => d.id));
-    this.metas.set(m.id, m);
+    this.storeMeta(m);
     if (persist) this.scheduleSaveIndex();
   }
 
@@ -546,6 +558,7 @@ export class LibraryService {
     });
     this.indexedIds.delete(docId);
     this.metas.delete(docId);
+    this.sectionMaps.delete(docId);
     void del(`meta:${docId}`);
     void del(`html:${docId}`);
     this.scheduleSaveIndex();
@@ -649,6 +662,21 @@ export class LibraryService {
 
   // ---------------------------------------------------------------- ricerca
 
+  private headingEntries() {
+    const v = this.version();
+    if (this.headingCache && this.headingCache.v === v) return this.headingCache.entries;
+    const entries: Array<{ m: DocMeta; s: Section; norm: string; bestiary: boolean }> = [];
+    for (const m of this.metas.values()) {
+      const bestiary = this.isBestiary(m.id);
+      for (const s of m.sections) {
+        const norm = normTerm(s.heading);
+        if (norm) entries.push({ m, s, norm, bestiary });
+      }
+    }
+    this.headingCache = { v, entries };
+    return entries;
+  }
+
   /**
    * Ordine dei risultati:
    * 1) voci con il titolo uguale alla ricerca (es. "Fireball"), prima le voci vere e poi le righe-formula;
@@ -659,9 +687,15 @@ export class LibraryService {
     const q = query.trim();
     if (!q) return [];
     const phrase = /^"(.+)"$/.exec(q)?.[1];
+    const phraseLow = phrase?.toLowerCase();
     const text = phrase ?? q;
     const terms = text.split(/\s+/).filter(Boolean);
+    const termsLow = terms.map(t => t.toLowerCase());
+    const termRes = terms
+      .filter(t => t.length >= 2)
+      .map(t => new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
     const key = normTerm(text);
+    const wantBestiary = scope === 'bestiary';
     const seen = new Set<string>();
     const first = (docId: string, anchor: string): boolean => {
       const k = `${docId}#${anchor}`;
@@ -674,7 +708,7 @@ export class LibraryService {
     const inScope = (id: string): boolean => {
       let ok = scopeCache.get(id);
       if (ok === undefined) {
-        ok = this.isBestiary(id) === (scope === 'bestiary');
+        ok = this.isBestiary(id) === wantBestiary;
         scopeCache.set(id, ok);
       }
       return ok;
@@ -685,51 +719,53 @@ export class LibraryService {
       path: this.pathText(m.id),
       anchor: s.id,
       heading: s.heading,
-      snippet: this.snippet(s.text || s.heading, terms),
+      snippet: this.snippet(s.text || s.heading, termsLow, termRes),
     });
 
     const exact: { hit: SearchHit; level: number }[] = [];
     const starts: SearchHit[] = [];
     if (key) {
-      for (const m of this.metas.values()) {
-        for (const s of m.sections) {
-          const h = normTerm(s.heading);
-          if (!h || (h !== key && !h.startsWith(key))) continue;
-          if (!inScope(m.id) || !first(m.id, s.id)) continue;
-          if (h === key) exact.push({ hit: make(m, s), level: s.level });
-          else starts.push(make(m, s));
-        }
+      for (const e of this.headingEntries()) {
+        if (e.bestiary !== wantBestiary) continue;
+        if (e.norm !== key && !e.norm.startsWith(key)) continue;
+        if (!first(e.m.id, e.s.id)) continue;
+        if (e.norm === key) exact.push({ hit: make(e.m, e.s), level: e.s.level });
+        else starts.push(make(e.m, e.s));
       }
     }
 
-    let res = this.ms.search(text, { combineWith: 'AND' });
-    if (!res.length && !phrase) res = this.ms.search(text, { combineWith: 'OR' });
     const rest: SearchHit[] = [];
-    for (const r of res) {
-      const m = this.metas.get(r['docId']);
-      const sec = m?.sections.find(s => s.id === r['anchor']);
-      if (!m || !sec || !inScope(m.id) || !first(m.id, sec.id)) continue;
-      if (phrase && !(sec.heading + ' ' + sec.text).toLowerCase().includes(phrase.toLowerCase())) continue;
-      rest.push(make(m, sec));
+    const remaining = limit - exact.length - starts.length;
+    if (remaining > 0) {
+      let res = this.ms.search(text, { combineWith: 'AND' });
+      if (!res.length && !phrase) res = this.ms.search(text, { combineWith: 'OR' });
+      for (const r of res) {
+        const docId = r['docId'] as string;
+        const m = this.metas.get(docId);
+        const sec = this.sectionMaps.get(docId)?.get(r['anchor'] as string);
+        if (!m || !sec || !inScope(docId) || !first(docId, sec.id)) continue;
+        if (phraseLow && !(sec.heading + ' ' + sec.text).toLowerCase().includes(phraseLow)) continue;
+        rest.push(make(m, sec));
+        if (rest.length >= remaining) break;
+      }
     }
 
     exact.sort((a, b) => a.level - b.level);
     return [...exact.map(e => e.hit), ...starts, ...rest].slice(0, limit);
   }
 
-  private snippet(text: string, terms: string[]): string {
+  private snippet(text: string, termsLow: string[], termRes: RegExp[]): string {
     const low = text.toLowerCase();
     let pos = -1;
-    for (const t of terms) {
-      const i = low.indexOf(t.toLowerCase());
+    for (const t of termsLow) {
+      const i = low.indexOf(t);
       if (i >= 0 && (pos < 0 || i < pos)) pos = i;
     }
     const start = Math.max(0, (pos < 0 ? 0 : pos) - 90);
     const part = text.slice(start, start + 320);
     let html = esc(part);
-    for (const t of terms) {
-      if (t.length < 2) continue;
-      const re = new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    for (const re of termRes) {
+      re.lastIndex = 0;
       html = html.replace(re, m => `<mark>${m}</mark>`);
     }
     return (start > 0 ? '… ' : '') + html + (start + 320 < text.length ? ' …' : '');
