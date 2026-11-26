@@ -380,9 +380,8 @@ input.num { width: 5.5rem; }
   font-size: 0.85rem;
   cursor: pointer;
 }
-.alpha:hover:not(:disabled) { border-color: var(--wax); color: var(--wax); }
+.alpha:hover { border-color: var(--wax); color: var(--wax); }
 .alpha.on { background: var(--wax); border-color: var(--wax-dark); color: var(--cream); }
-.alpha:disabled { opacity: 0.35; cursor: default; }
 .bestiary-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.4rem; }
 .bestiary-row { align-items: center; }
 .bestiary-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1 1 240px; }

@@ -172,7 +172,6 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
               type="button"
               class="alpha"
               [class.on]="letter() === ch"
-              [disabled]="!availableLetters().has(ch)"
               (click)="setLetter(letter() === ch ? '' : ch)"
             >
               {{ ch }}
@@ -501,13 +500,6 @@ export class BestiaryComponent {
     return [...counts.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name, 'en'));
-  });
-
-  /** Lettere disponibili considerando gli altri filtri (esclusa la lettera stessa). */
-  readonly availableLetters = computed(() => {
-    const set = new Set<string>();
-    for (const e of this.entries()) set.add(e.letter);
-    return set;
   });
 
   readonly hasFilters = computed(
