@@ -74,8 +74,8 @@ Come già indicato nel `README.md`, servirebbe passare a **Google OAuth 2.0** la
 
 1. **Accoppiamento tra `mergeGroups` e `LookupService.spellDocIds()`**:
    - I capitoli delle spell sono identificati riutilizzando le regex di `environment.mergeGroups`. Modificare o rimuovere `mergeGroups` comprometterebbe la ricerca mirata dei semi in `explainSeed()`.
-2. **Dimensione del repository Git (~151,6 MB di snapshot in `src/assets/`)**:
-   - Committare ripetutamente 150 MB di file `.jsonl` su Git fa crescere rapidamente la dimensione del repository `.git` (non è usato Git LFS).
+2. **Dimensione del repository Git (~121,3 MB di snapshot in `src/assets/`)**:
+   - Committare ripetutamente oltre 120 MB di file `.jsonl` su Git fa crescere rapidamente la dimensione del repository `.git` (non è usato Git LFS).
 3. **Dipendenza dai nomi dei file nel calcolatore (`ItemCalcComponent`)**:
    - La classificazione delle variazioni usa regex rigide sui nomi dei documenti (`/Ch 8/i`, `/Feat/i`, `/Skill/i`): rinominare quei file sul Drive svuoterebbe le rispettive liste nel calcolatore.
 4. **Euristiche fragili sul formato dei `.docx`**:
@@ -94,6 +94,10 @@ Come già indicato nel `README.md`, servirebbe passare a **Google OAuth 2.0** la
 - [x] Aggiungere `"assets": ["src/assets"]` in `angular.json` per rendere effettivi gli snapshot in build (fatto su `SteBranch`; in prospettiva valutare hosting esterno degli snapshot per alleggerire Git).
 - [x] Correggere `.term-link` in `styles.css` così da rendere visivamente riconoscibili i termini cliccabili nei testi (fatto su `SteBranch`).
 - [x] Aggiornare `README.md` con tutte le nuove funzionalità (fatto su `SteBranch`).
+- [ ] **Mini-refactoring di `src/app/custom-entries.ts` (se crescono le voci editoriali del sito):**
+  - Generare automaticamente `html` e `text` a partire da campi strutturati (`prerequisite`, `benefit`, `cost`, `special`, `note`) per eliminare la duplicazione manuale tra plain text e HTML.
+  - Registrare il documento virtuale `site:custom-metamagic` direttamente dentro `LibraryService` (in `metas` e `MiniSearch`) così `LookupService`, `linkTerms()`, `headingEntries()` e la ricerca full-text lo ereditano automaticamente senza i controlli `if (id === CUSTOM_DOC_ID)` sparsi nei servizi.
+- [ ] Paginazione / rendering on-demand per sezione su documenti enormi come `Ch 8 + 8a` (5,6 MB, >5.200 bottoni formula nel DOM).
 - [ ] Aggiornare `theme-color` in `index.html` e il commento datato in `environment.ts`.
 - [ ] Introdurre una suite leggera di unit test (es. Vitest) per `doc-parser`, `term-links`, `item-calc` e verifica automatica di `ITEM_PRESETS` / `COMPOSITE_ITEMS`.
 - [ ] Aggiungere un pulsante manuale "Aggiorna dal Drive" nella barra di stato senza dover fare logout/login.
