@@ -6,6 +6,7 @@ import { DriveService, displayName } from './drive.service';
 import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
 import { DocMeta, SearchHit, Section, TreeNode } from './models';
 import { TermMap, TermTarget, buildTermMap, namesOf } from './term-links';
+import { compressImageToDataUri } from './image-compress';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -632,14 +633,17 @@ export class LibraryService {
     }
   }
 
-  /** Scarica un file e lo converte in HTML grezzo. */
+  /** Scarica un file e lo converte in HTML grezzo (comprimendo le immagini in WebP). */
   private async fetchHtml(part: TreeNode): Promise<string> {
     if (part.kind === 'text') return `<pre class="plain">${esc(await this.drive.downloadText(part))}</pre>`;
     const [buf, mammoth] = await Promise.all([
       this.drive.downloadBinary(part),
       import('mammoth/mammoth.browser'),
     ]);
-    return (await mammoth.convertToHtml({ arrayBuffer: buf }, { styleMap: STYLE_MAP })).value;
+    const convertImage = mammoth.images.imgElement(async img => ({
+      src: await compressImageToDataUri(await img.readAsBase64String(), img.contentType),
+    }));
+    return (await mammoth.convertToHtml({ arrayBuffer: buf }, { styleMap: STYLE_MAP, convertImage })).value;
   }
 
   private plainParse(html: string, node: TreeNode, prefix: string) {
