@@ -11,8 +11,18 @@ import {
   CR_OPTIONS,
   extractBestiaryEntry,
 } from './bestiary-index';
+import {
+  DIFFICULTIES,
+  ENCOUNTER_STYLES,
+  EncounterSlot,
+  EncounterStyle,
+  encounterBudgetXp,
+  estimateCrFromXp,
+  generateEncounter,
+  rerollSlot,
+} from './encounter-gen';
 
-type ViewMode = 'catalog' | 'folders';
+type ViewMode = 'catalog' | 'encounter' | 'folders';
 type SortMode = 'name-asc' | 'name-desc' | 'cr-asc' | 'cr-desc';
 
 const PAGE_SIZE = 100;
@@ -47,6 +57,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
     <div class="chips" role="tablist" aria-label="Modalità vista bestiario">
       <button type="button" class="chip" role="tab" [attr.aria-selected]="mode() === 'catalog'" [class.on]="mode() === 'catalog'" (click)="mode.set('catalog')">
         Catalogo filtrabile<small>{{ entries().length }}</small>
+      </button>
+      <button type="button" class="chip" role="tab" [attr.aria-selected]="mode() === 'encounter'" [class.on]="mode() === 'encounter'" (click)="mode.set('encounter')">
+        Generatore incontri
       </button>
       <button type="button" class="chip" role="tab" [attr.aria-selected]="mode() === 'folders'" [class.on]="mode() === 'folders'" (click)="mode.set('folders')">
         Per cartelle<small>{{ folders().length }}</small>
@@ -216,6 +229,160 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           </button>
         </p>
       }
+    } @else if (mode() === 'encounter') {
+      <section class="calc-block bestiary-controls">
+        <h2>Gruppo e difficoltà</h2>
+        <div class="bestiary-filters">
+          <label>
+            Numero giocatori
+            <input
+              type="number"
+              class="enc-num"
+              min="1"
+              max="12"
+              aria-label="Numero giocatori"
+              [value]="players()"
+              (input)="setPlayers(+$any($event.target).value)"
+            />
+          </label>
+
+          <label>
+            Livello medio gruppo
+            <input
+              type="number"
+              class="enc-num"
+              min="1"
+              max="20"
+              aria-label="Livello medio gruppo"
+              [value]="partyLevel()"
+              (input)="setPartyLevel(+$any($event.target).value)"
+            />
+          </label>
+
+          <label>
+            Difficoltà
+            <select aria-label="Difficoltà incontro" [value]="diffOffset()" (change)="diffOffset.set(+$any($event.target).value)">
+              @for (d of difficulties; track d.id) {
+                <option [value]="d.offset">{{ d.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Composizione
+            <select aria-label="Composizione incontro" [value]="encStyle()" (change)="encStyle.set($any($event.target).value)">
+              @for (s of encounterStyles; track s.value) {
+                <option [value]="s.value">{{ s.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <h3>Filtri creature (facoltativi)</h3>
+        <div class="bestiary-filters">
+          <label>
+            Tipo
+            <select aria-label="Tipo creature per incontro" [value]="encCategory()" (change)="setEncCategory($any($event.target).value)">
+              <option value="">Tutti i tipi</option>
+              @for (c of categories(); track c.name) {
+                <option [value]="c.name">{{ c.name }} ({{ c.count }})</option>
+              }
+            </select>
+          </label>
+
+          @if (encSubcategories().length) {
+            <label>
+              Sottocategoria
+              <select aria-label="Sottocategoria per incontro" [value]="encSubcategory()" (change)="encSubcategory.set($any($event.target).value)">
+                <option value="">Tutte</option>
+                @for (s of encSubcategories(); track s.name) {
+                  <option [value]="s.name">{{ s.name }} ({{ s.count }})</option>
+                }
+              </select>
+            </label>
+          }
+
+          <label>
+            Ambiente
+            <select aria-label="Ambiente per incontro" [value]="encEnv()" (change)="encEnv.set($any($event.target).value)">
+              <option value="">Tutti gli ambienti</option>
+              @for (g of envGroups; track g.key) {
+                <option [value]="g.key">{{ g.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Taglia
+            <select aria-label="Taglia per incontro" [value]="encSize()" (change)="encSize.set($any($event.target).value)">
+              <option value="">Tutte le taglie</option>
+              @for (sz of sizes; track sz) {
+                <option [value]="sz">{{ sz }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        <div class="enc-actions">
+          <button type="button" class="primary-btn" (click)="rollEncounter()" [disabled]="!encPool().length">
+            {{ encSlots().length ? 'Rigenera incontro casuale' : 'Genera incontro casuale' }}
+          </button>
+          @if (hasEncFilters()) {
+            <button type="button" class="ghost" (click)="resetEncFilters()">Azzera filtri</button>
+          }
+          <span class="muted small">
+            Budget target: <strong>{{ fmt(encBudget()) }} XP</strong> (CR ~{{ encBudgetCr() }}) ·
+            {{ encPool().length }} creature compatibili nel pool
+          </span>
+        </div>
+      </section>
+
+      @if (encSlots().length) {
+        <section class="calc-block enc-result" aria-live="polite">
+          <div class="enc-result-head">
+            <div>
+              <h2>Incontro generato · CR stimato {{ encActualCr() }}</h2>
+              <p class="muted small">
+                Totale: <strong>{{ fmt(encTotalXp()) }} XP</strong> (budget {{ fmt(encBudget()) }} XP · {{ encFitLabel() }}) ·
+                <strong>{{ fmt(encXpPerPlayer()) }} XP</strong> a giocatore ({{ players() }} PG)
+              </p>
+            </div>
+            <button type="button" class="ghost" (click)="rollEncounter()">Nuovo lancio</button>
+          </div>
+
+          <ul class="list enc-list">
+            @for (slot of encSlots(); track slot.entry.docId + ':' + slot.cr) {
+              <li class="enc-row">
+                <div class="enc-qty" role="group" [attr.aria-label]="'Quantità ' + slot.entry.name">
+                  <button type="button" class="ghost qty-btn" (click)="adjustSlot($index, -1)" aria-label="Rimuovi uno">−</button>
+                  <strong class="qty-val">{{ slot.count }}×</strong>
+                  <button type="button" class="ghost qty-btn" (click)="adjustSlot($index, 1)" aria-label="Aggiungi uno">+</button>
+                </div>
+
+                <div class="bestiary-main">
+                  <a [routerLink]="['/doc', slot.entry.docId]">
+                    <app-icon [name]="'dragon'" />
+                    <strong>{{ slot.entry.name }}</strong>
+                  </a>
+                  <span class="entry-meta muted">
+                    {{ slot.entry.category }}@if (slot.entry.subcategory) { › {{ slot.entry.subcategory }} }
+                    @if (slot.entry.sizes.length) { · {{ slot.entry.sizes.join('/') }} }
+                    @if (slot.entry.envs.length) { · {{ formatEnvs(slot.entry.envs) }} }
+                  </span>
+                </div>
+
+                <div class="enc-slot-right">
+                  <span class="cr-badge">{{ slot.crLabel }}</span>
+                  <small class="muted">{{ fmt(slot.xpEach * slot.count) }} XP</small>
+                  <button type="button" class="ghost small" (click)="swapSlot($index)">Cambia</button>
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      } @else if (encTried()) {
+        <p class="muted">Nessuna creatura disponibile nel pool con questi filtri: prova ad allargare Tipo, Ambiente o Taglia.</p>
+      }
     } @else {
       @if (folders().length) {
         <div class="cards">
@@ -249,6 +416,8 @@ export class BestiaryComponent {
   readonly crOptions = CR_OPTIONS;
   readonly crMaxIndex = CR_OPTIONS.length - 1;
   readonly letters = LETTERS;
+  readonly difficulties = DIFFICULTIES;
+  readonly encounterStyles = ENCOUNTER_STYLES;
 
   readonly mode = signal<ViewMode>('catalog');
   readonly rawQuery = signal('');
@@ -262,6 +431,18 @@ export class BestiaryComponent {
   readonly letter = signal('');
   readonly sort = signal<SortMode>('name-asc');
   readonly limit = signal(PAGE_SIZE);
+
+  // Stato del generatore di incontri
+  readonly players = signal(4);
+  readonly partyLevel = signal(5);
+  readonly diffOffset = signal(0);
+  readonly encStyle = signal<EncounterStyle>('random');
+  readonly encCategory = signal('');
+  readonly encSubcategory = signal('');
+  readonly encEnv = signal('');
+  readonly encSize = signal('');
+  readonly encSlots = signal<EncounterSlot[]>([]);
+  readonly encTried = signal(false);
 
   readonly crActive = computed(() => this.crMinIdx() > 0 || this.crMaxIdx() < this.crMaxIndex);
   readonly crMinPct = computed(() => (this.crMinIdx() / this.crMaxIndex) * 100);
@@ -397,6 +578,109 @@ export class BestiaryComponent {
   });
 
   readonly visible = computed(() => this.filtered().slice(0, this.limit()));
+
+  // ---------------------------------------------------------------- generatore incontri
+
+  readonly encSubcategories = computed(() => {
+    const cat = this.encCategory();
+    if (!cat) return [];
+    const counts = new Map<string, number>();
+    for (const e of this.entries()) {
+      if (e.category === cat && e.subcategory) {
+        counts.set(e.subcategory, (counts.get(e.subcategory) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+  });
+
+  readonly hasEncFilters = computed(
+    () => !!this.encCategory() || !!this.encSubcategory() || !!this.encEnv() || !!this.encSize()
+  );
+
+  readonly encPool = computed(() => {
+    const cat = this.encCategory();
+    const sub = this.encSubcategory();
+    const env = this.encEnv();
+    const sz = this.encSize();
+    return this.entries().filter(e => {
+      if (!e.crs.length) return false;
+      if (cat && e.category !== cat) return false;
+      if (sub && e.subcategory !== sub) return false;
+      if (env && !e.envs.includes(env)) return false;
+      if (sz && !e.sizes.includes(sz)) return false;
+      return true;
+    });
+  });
+
+  readonly encBudget = computed(() => encounterBudgetXp(this.players(), this.partyLevel(), this.diffOffset()));
+  readonly encBudgetCr = computed(() => estimateCrFromXp(this.encBudget()));
+  readonly encTotalXp = computed(() => this.encSlots().reduce((t, s) => t + s.xpEach * s.count, 0));
+  readonly encActualCr = computed(() => estimateCrFromXp(this.encTotalXp()));
+  readonly encXpPerPlayer = computed(() => Math.round(this.encTotalXp() / Math.max(1, this.players())));
+  readonly encFitLabel = computed(() => {
+    const ratio = this.encTotalXp() / Math.max(1, this.encBudget());
+    if (ratio < 0.75) return 'sotto budget';
+    if (ratio > 1.25) return 'sopra budget';
+    return 'in linea col budget';
+  });
+
+  setPlayers(n: number): void {
+    if (!Number.isFinite(n)) return;
+    this.players.set(Math.max(1, Math.min(12, Math.round(n))));
+  }
+
+  setPartyLevel(n: number): void {
+    if (!Number.isFinite(n)) return;
+    this.partyLevel.set(Math.max(1, Math.min(20, Math.round(n))));
+  }
+
+  setEncCategory(v: string): void {
+    this.encCategory.set(v);
+    this.encSubcategory.set('');
+  }
+
+  resetEncFilters(): void {
+    this.encCategory.set('');
+    this.encSubcategory.set('');
+    this.encEnv.set('');
+    this.encSize.set('');
+  }
+
+  rollEncounter(): void {
+    this.encTried.set(true);
+    const res = generateEncounter(
+      this.encPool(),
+      this.players(),
+      this.partyLevel(),
+      this.diffOffset(),
+      this.encStyle()
+    );
+    this.encSlots.set(res ? res.slots : []);
+  }
+
+  adjustSlot(index: number, delta: number): void {
+    this.encSlots.update(list =>
+      list
+        .map((s, i) => (i === index ? { ...s, count: s.count + delta } : s))
+        .filter(s => s.count > 0)
+    );
+  }
+
+  swapSlot(index: number): void {
+    const list = this.encSlots();
+    const cur = list[index];
+    if (!cur) return;
+    const exclude = new Set(list.map(s => s.entry.docId));
+    const next = rerollSlot(this.encPool(), cur, exclude);
+    if (!next) return;
+    this.encSlots.update(items => items.map((s, i) => (i === index ? next : s)));
+  }
+
+  fmt(n: number): string {
+    return Math.round(n).toLocaleString('it-IT');
+  }
 
   onSearch(value: string): void {
     this.rawQuery.set(value);

@@ -399,3 +399,38 @@ input.num { width: 5.5rem; }
   white-space: nowrap;
 }
 .bestiary-more { text-align: center; margin: 0.9rem 0; }
+
+/* generatore incontri casuali */
+.bestiary-filters input.enc-num {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgb(240 226 186 / 0.8);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+}
+.enc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem 0.9rem; margin-top: 0.8rem; }
+.primary-btn {
+  padding: 0.55rem 1.05rem;
+  border: 1px solid var(--wax-dark);
+  border-radius: 3px;
+  background: linear-gradient(var(--wax-light), var(--wax));
+  color: var(--cream);
+  font-family: Cinzel, Georgia, serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.primary-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.primary-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.enc-result-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; }
+.enc-result-head h2 { margin-bottom: 0.15rem; }
+.enc-result-head p { margin: 0; }
+.enc-list { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0.4rem 0 0; }
+.enc-row { align-items: center; }
+.enc-qty { display: inline-flex; align-items: center; gap: 0.3rem; flex: none; }
+.qty-btn { padding: 0.15rem 0.5rem; font-size: 0.95rem; line-height: 1.2; }
+.qty-val { min-width: 2rem; text-align: center; font-family: Cinzel, Georgia, serif; color: var(--wax); }
+.enc-slot-right { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }
