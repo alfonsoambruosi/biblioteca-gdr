@@ -23,6 +23,10 @@ import { LookupService, isDocNode } from './lookup.service';
           <span class="muted">{{ lookup.countFiles(c) }} documenti</span>
         </a>
       }
+      <a class="card" routerLink="/bestiario">
+        <strong class="card-title"><app-icon [name]="'dragon'" />Bestiario</strong>
+        <span class="muted">Filtra per CR, tipo, ambiente e taglia</span>
+      </a>
       <a class="card" routerLink="/incantesimi">
         <strong class="card-title"><app-icon [name]="'spell'" />Incantesimi per classe</strong>
         <span class="muted">Liste e livelli</span>

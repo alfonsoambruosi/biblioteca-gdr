@@ -24,6 +24,9 @@ import { BestiarySearchComponent } from './bestiary-search.component';
       <h1 class="card-title"><app-icon [name]="icon(f.name)" />{{ f.name }}</h1>
 
       @if (inBestiary()) {
+        <p class="bestiary-banner">
+          <a class="ghost" routerLink="/bestiario">Apri il Bestiario con filtri (CR, tipo, ambiente, taglia) →</a>
+        </p>
         <app-bestiary-search />
       }
 
