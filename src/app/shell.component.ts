@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth.service';
@@ -8,6 +8,7 @@ import { LibraryService } from './library.service';
 @Component({
   selector: 'app-shell',
   imports: [RouterLink, RouterOutlet, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="top">
       <a class="brand" routerLink="/">Biblioteca GDR</a>

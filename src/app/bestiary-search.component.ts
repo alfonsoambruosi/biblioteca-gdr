@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LibraryService } from './library.service';
 
@@ -6,6 +6,7 @@ import { LibraryService } from './library.service';
 @Component({
   selector: 'app-bestiary-search',
   imports: [RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="bestiary-search">
       <input

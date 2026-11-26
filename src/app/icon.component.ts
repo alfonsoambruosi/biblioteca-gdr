@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 export type IconKey = 'dragon' | 'shield' | 'scroll' | 'spell' | 'gem' | 'lantern' | 'people' | 'book' | 'folder';
 
@@ -17,6 +17,7 @@ export function iconFor(name: string, isFolder = true): IconKey {
 
 @Component({
   selector: 'app-icon',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @switch (name()) {
       @case ('dragon') {

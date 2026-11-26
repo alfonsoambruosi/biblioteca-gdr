@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LibraryService } from './library.service';
 import { LookupService } from './lookup.service';
@@ -51,6 +51,7 @@ function tokenKey(name: string): string {
 @Component({
   selector: 'app-item-calc',
   imports: [RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="crumbs"><a routerLink="/">Home</a> <span>›</span> <span>Creazione oggetti magici</span></nav>
     <h1>Creazione oggetti magici</h1>

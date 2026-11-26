@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent, iconFor } from './icon.component';
 import { LibraryService } from './library.service';
@@ -7,6 +7,7 @@ import { LookupService, isDocNode } from './lookup.service';
 @Component({
   selector: 'app-home',
   imports: [RouterLink, IconComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>Biblioteca</h1>
     <p class="muted">Scegli una categoria.</p>

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent } from './icon.component';
 import { LibraryService } from './library.service';
@@ -13,6 +13,7 @@ function label(key: string): string {
 @Component({
   selector: 'app-spellbook',
   imports: [RouterLink, IconComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1 class="card-title"><app-icon [name]="'spell'" />Incantesimi per classe</h1>
     <p class="muted">

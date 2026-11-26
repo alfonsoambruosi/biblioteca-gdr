@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
@@ -10,6 +10,7 @@ import { BestiarySearchComponent } from './bestiary-search.component';
 @Component({
   selector: 'app-folder',
   imports: [RouterLink, IconComponent, BestiarySearchComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="crumbs" aria-label="Percorso">
       <a routerLink="/">Home</a>
