@@ -39,10 +39,10 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Flusso
 
 ## 2. Sviluppo locale
 
-Requisito: **Node.js LTS** (la CI utilizza Node 22).
+Requisito: **Node.js `>= 22.12.0`** (dichiarato in `package.json` → `engines.node`; la CI utilizza **Node 24**).
 
 ```bash
-npm install
+npm ci
 ```
 
 Inserire temporaneamente la chiave API in `src/environments/environment.ts` al posto di `INSERISCI_QUI_LA_TUA_API_KEY` (**senza committarla su Git!**), quindi avviare:
@@ -67,9 +67,9 @@ Il workflow **Pubblica su GitHub Pages** gira automaticamente su ogni `push` su 
 
 ```mermaid
 flowchart LR
-    PUSH["Push su main /\nworkflow_dispatch"] --> CO["actions/checkout@v4\n+ setup-node@v4 (Node 22)"]
-    CO --> SED["sed sostituisce placeholder\ncon secrets.DRIVE_API_KEY\nin src/environments/environment.ts"]
-    SED --> BUILD["npm install &&\nnpm run build"]
+    PUSH["Push su main /\nworkflow_dispatch"] --> CO["actions/checkout@v4\n+ setup-node@v4 (Node 24, cache: npm)"]
+    CO --> KEY["Verifica DRIVE_API_KEY e sostituisce\nil placeholder via Node\nin src/environments/environment.ts"]
+    KEY --> BUILD["npm ci &&\nnpm run build"]
     BUILD --> UP["upload-pages-artifact@v3\n(dist/biblioteca-gdr/browser)"]
     UP --> DEP["deploy-pages@v4\n(environment: github-pages)"]
 ```
@@ -79,8 +79,8 @@ flowchart LR
 2. **Settings → Pages → Source**: selezionare **GitHub Actions**.
 3. **Concorrenza**: il workflow ha `concurrency: { group: pages, cancel-in-progress: true }`.
 
-> [!warning] Attenzione al `sed` nel workflow
-> Il passo `sed -i "s|INSERISCI_QUI_LA_TUA_API_KEY|${{ secrets.DRIVE_API_KEY }}|" src/environments/environment.ts` funziona **solo** se nel file committato su `main` è presente esattamente la stringa segnaposto `INSERISCI_QUI_LA_TUA_API_KEY`.
+> [!warning] Validazione di `DRIVE_API_KEY` e del segnaposto
+> Prima del build il workflow passa il secret via `env:` a uno script Node che verifica sia che `DRIVE_API_KEY` non sia vuoto, sia che in `src/environments/environment.ts` sia presente esattamente il segnaposto `INSERISCI_QUI_LA_TUA_API_KEY`. Se una delle due condizioni manca, il job fallisce esplicitamente evitando di pubblicare un sito non funzionante.
 
 ---
 

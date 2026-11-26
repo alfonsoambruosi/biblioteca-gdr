@@ -23,12 +23,13 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Modell
 
 | File | Ruolo |
 |---|---|
-| `package.json` | Manifest NPM (`biblioteca-gdr` v1.0.0), script `start`/`build`/`watch`, dipendenze Angular 20 + `idb-keyval` + `mammoth` + `minisearch` |
+| `package.json` | Manifest NPM (`biblioteca-gdr` v1.0.0), `engines.node >= 22.12.0`, script `start`/`build`/`watch`, dipendenze Angular 20 + `idb-keyval` + `mammoth` + `minisearch` |
+| `package-lock.json` | Lockfile NPM per installazioni riproducibili in locale e in CI (`npm ci`) |
 | `angular.json` | Configurazione Angular CLI / `@angular/build:application`, budget, `allowedCommonJsDependencies` |
 | `tsconfig.json` | Opzioni TypeScript strict, `ES2022`, `strictTemplates` |
 | `tsconfig.app.json` | Configurazione compilazione app (`src/main.ts` + `src/**/*.d.ts`) |
 | `.gitignore` | Esclude `node_modules/`, `dist/`, `.angular/`, `.DS_Store` |
-| `.github/workflows/pages.yml` | Pipeline CI/CD GitHub Pages (Node 22, iniezione `DRIVE_API_KEY` via `sed`, build e deploy) |
+| `.github/workflows/pages.yml` | Pipeline CI/CD GitHub Pages (Node 24, `cache: npm`, validazione e iniezione `DRIVE_API_KEY` via Node, `npm ci`, build e deploy) |
 | `README.md` | Guida principale di setup, funzionamento, funzionalità (inclusi calcolatore oggetti, ricerca bestiario, term-links, snapshot), sicurezza e deploy |
 | `GITHUB-PAGES.md` | Guida passo-passo per deploy su GitHub Pages e caricamento degli `snapshot-N.jsonl` |
 

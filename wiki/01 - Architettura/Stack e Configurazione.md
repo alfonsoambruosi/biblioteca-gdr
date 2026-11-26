@@ -19,9 +19,9 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Routing, Layout e Auth]], [[Flusso
 
 ---
 
-## Stack tecnologico (`package.json`)
+## Stack tecnologico (`package.json` e `package-lock.json`)
 
-Il progetto è un'applicazione client-side pura basata su **Angular 20** con build via `@angular/build` (esbuild/Vite) e senza alcun backend proprietario.
+Il progetto è un'applicazione client-side pura basata su **Angular 20** con build via `@angular/build` (esbuild/Vite) e senza alcun backend proprietario. Richiede **Node.js `>= 22.12.0`** (`engines.node` in `package.json`) e committa `package-lock.json` per garantire build riproducibili con `npm ci`.
 
 ### Dipendenze di runtime
 
@@ -100,7 +100,7 @@ export const environment = {
 | Chiave | Tipo | Scopo |
 |---|---|---|
 | `driveRootId` | `string` | ID della cartella radice su Google Drive (condivisa pubblicamente in lettura). |
-| `apiKey` | `string` | Chiave API Google Drive. Nel repo è presente il segnaposto `INSERISCI_QUI_LA_TUA_API_KEY`; in CI su GitHub Actions viene sostituito a build time via `sed` dal secret `DRIVE_API_KEY` (vedi [[Setup, Build e Deploy]]). `DriveService.configured` controlla `!!key && !key.startsWith('INSERISCI')`. |
+| `apiKey` | `string` | Chiave API Google Drive. Nel repo è presente il segnaposto `INSERISCI_QUI_LA_TUA_API_KEY`; in CI su GitHub Actions viene validato e sostituito a build time via script Node dal secret `DRIVE_API_KEY` (il job fallisce se vuoto o se il segnaposto manca; vedi [[Setup, Build e Deploy]]). `DriveService.configured` controlla `!!key && !key.startsWith('INSERISCI')`. |
 | `mergeGroups` | `{ pattern: RegExp; name: string }[]` | Regole di fusione virtuale per file nella stessa cartella. Attualmente unisce `Ch 8 - Spells` e `Ch 8a - Spells Grimoire` in un unico documento virtuale. **Effetto collaterale importante**: le stesse regex sono usate da `LookupService.spellDocIds()` per individuare quali documenti contengono le spell! |
 
 ---

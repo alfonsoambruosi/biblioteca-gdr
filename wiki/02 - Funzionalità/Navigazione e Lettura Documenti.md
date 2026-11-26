@@ -53,8 +53,9 @@ Reagisce al parametro `:id` tramite `toSignal(route.paramMap)` e mostra:
 ### Caricamento e ciclo di vita
 - Un `effect()` osserva `this.id()` e `this.library.tree()`: appena il nodo esiste nell'albero chiama `load(id)`.
 - `load(id)` recupera l'HTML da `library.getHtml(id)` (che legge da IndexedDB o sincronizza on-demand se mancante/stale).
-- Inietta l'HTML tramite `DomSanitizer.bypassSecurityTrustHtml(raw)` (per preservare `id`, tabelle, `data-*` e pulsanti delle formule).
-- Nel `setTimeout` successivo al render Angular:
+- **Protezione da race condition (`loadRun` / `panelRun`)**: ogni caricamento incrementa un contatore (`loadRun` per il documento, `panelRun` per il pannello inferiore, entrambi invalidati anche su cambio pagina, documento non trovato, chiusura pannello e `DestroyRef.onDestroy`). Se una richiesta lenta termina dopo un cambio documento o un nuovo clic, il risultato viene scartato senza sovrascrivere testo, stato di caricamento o scroll.
+- Inietta l'HTML tramite `DomSanitizer.bypassSecurityTrustHtml(optimized)` (aggiungendo `loading="lazy" decoding="async"` sulle `<img>` e preservando `id`, tabelle, `data-*` e pulsanti delle formule).
+- Nel `setTimeout` successivo al render Angular (verificando che `loadRun` e `linkRun` siano ancora attuali):
   1. Esegue **`linkNames()`** (auto-linking di feat, talenti e spell nel testo tramite `TreeWalker` + `splitTerms`, vedi [[Parser, Formule Spell e Lookup#3. Auto-linking dei termini (term-links.ts e DocComponent)]]).
   2. Esegue **`scrollToFragment()`** per portare l'utente esattamente all'ancora passata nel fragment URL (es. da un risultato di ricerca o dallo Spellbook).
 
@@ -73,8 +74,8 @@ Un unico handler `(click)="onClick($event)"` è agganciato sia al corpo del docu
    - Altrimenti (metamagia o altro componente): chiama `lookup.explain(term)`.
    - Mostra il risultato nel pannello inferiore.
 3. **Clic su `button.expand-formula`**:
-   - Alterna apertura/chiusura del contenitore `.formula-detail` immediatamente successivo.
-   - All'apertura legge `data-terms` (lista separata da `|`, con prefisso `*N*` per i semi di livello `N`), risolve in sequenza tutte le descrizioni e le inserisce inline sotto la formula.
+   - Alterna apertura/chiusura del contenitore `.formula-detail` immediatamente successivo (disabilitando temporaneamente il pulsante per evitare doppi clic e ripristinandolo in caso di errore).
+   - All'apertura legge `data-terms` (lista separata da `|`, con prefisso `*N*` per i semi di livello `N`), risolve in parallelo (`Promise.all`) tutte le descrizioni e le inserisce inline sotto la formula solo se `loadRun` è ancora corrente e il nodo è ancora nel DOM.
 
 ### Pannello inferiore ridimensionabile (`.seed-panel`)
 - Posizionato fisso in basso (`width: min(760px, calc(100vw - 1.2rem))`, `z-index: 20`).
