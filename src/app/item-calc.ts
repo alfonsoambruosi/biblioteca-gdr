@@ -1,7 +1,8 @@
 /**
  * Calcolo del costo degli oggetti magici in numen.
  * Livello dell'oggetto = livello della spell base + variazioni (metamagia, talenti, abilità);
- * costo = livello × livello dell'incantatore × prezzo base × moltiplicatore.
+ * se il livello finale è 0 (trucchetto), nel calcolo del costo vale 0,5.
+ * costo = livello effettivo × livello dell'incantatore × prezzo base × moltiplicatore.
  */
 
 export type ModKind = 'metamagia' | 'talento' | 'abilita' | 'proprieta' | 'manuale';
@@ -32,6 +33,8 @@ export interface ItemInput {
 
 export interface ItemResult {
   level: number;
+  /** livello effettivo usato nel calcolo (0,5 quando level === 0) */
+  effectiveLevel: number;
   /** totale nell'unità del prezzo (numen, oppure gp per dose) */
   total: number;
   /** solo per unit 'gp': costo della scorta privata in numen */
@@ -50,21 +53,23 @@ export function calcItem(input: ItemInput): ItemResult {
   const active = input.mods.filter(m => m.on);
   const delta = active.reduce((t, m) => t + m.adj, 0);
   const level = Math.max(0, input.baseLevel + delta);
+  // I trucchetti (livello finale 0) valgono 0,5 nel calcolo del costo
+  const effectiveLevel = level === 0 ? 0.5 : level;
   const unit = input.unit ?? 'numen';
-  let total = level * input.cl * input.price * input.multiplier;
-  // alchimia: la tabella del Compendio fissa 25 gp come minimo per i livelli 0
-  if (unit === 'gp' && level === 0) total = Math.max(total, 25);
+  const total = effectiveLevel * input.cl * input.price * input.multiplier;
   const parts = [`${input.baseLevel}`];
   for (const m of active) {
     parts.push(m.adj >= 0 ? `+ ${m.name} (+${m.adj})` : `- ${m.name} (${m.adj})`);
   }
+  const levelText = level === 0 ? '0° livello (vale 0,5)' : `${level}° livello`;
   const head =
-    `${parts.join(' ')} = ${level}° livello × CL ${input.cl} × ${input.price}` +
+    `${parts.join(' ')} = ${levelText} × CL ${input.cl} × ${input.price}` +
     (input.multiplier !== 1 ? ` × ${input.multiplier}` : '');
   if (unit === 'gp') {
     const stock = total * STOCK_RATIO;
     return {
       level,
+      effectiveLevel,
       total,
       stockNumen: stock,
       formula: `${head} = ${total.toLocaleString('it-IT')} gp a dose; scorta privata: ${stock.toLocaleString('it-IT')} numen (× ${STOCK_RATIO})`,
@@ -72,6 +77,7 @@ export function calcItem(input: ItemInput): ItemResult {
   }
   return {
     level,
+    effectiveLevel,
     total,
     stockNumen: null,
     formula: `${head} = ${total.toLocaleString('it-IT')} numen`,

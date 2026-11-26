@@ -174,14 +174,19 @@ function tokenKey(name: string): string {
         </label>
       </div>
       <p class="muted small">
-        Numen: 500 per uso attivato. Alchimia: 50 gp per livello × CL. La scorta privata costa 18 volte i gp in numen.
+        Numen: 500 per uso attivato. Alchimia: 50 gp per livello × CL. Un trucchetto (livello finale 0) vale 0,5 nel calcolo. La scorta privata costa 18 volte i gp in numen.
       </p>
     </section>
 
     <section class="calc-block result" aria-live="polite">
       <h2>Risultato</h2>
       @if (base()) {
-        <p>Livello finale: <strong>{{ result().level }}</strong></p>
+        <p>
+          Livello finale: <strong>{{ result().level }}</strong>
+          @if (result().level === 0) {
+            <span class="muted">(considerato 0,5 nel calcolo)</span>
+          }
+        </p>
         <p class="formula">{{ result().formula }}</p>
         @if (unit() === 'gp') {
           <p class="total">{{ fmt(result().total) }} gp a dose</p>
@@ -417,7 +422,7 @@ export class ItemCalcComponent {
   }
 
   partValue(p: CompositePart): number {
-    return p.kind === 'fixed' ? p.total : p.level * p.cl * p.price * p.mult;
+    return p.kind === 'fixed' ? p.total : (p.level === 0 ? 0.5 : p.level) * p.cl * p.price * p.mult;
   }
 
   pickComposite(index: string): void {
