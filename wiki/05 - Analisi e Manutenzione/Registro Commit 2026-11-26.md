@@ -62,13 +62,15 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 33 | `3be8d9a` | Docs | Aggiornata wiki per pricing `0,5` dei trucchetti di livello 0 e registro commit | Locale |
 | 34 | `3f156f6` | Docs | Riallineate pagine wiki tecniche con CI workflow, `package-lock.json` e guardie race condition di `DocComponent` | Locale |
 | 35 | `d52912c` | Refactor | Rimossa logica `availableLetters` / `[disabled]` dalla barra alfabetica A–Z del Bestiario (tutte le 27 lettere sono presenti) | Locale |
+| 36 | `a660d8d` | Docs | Riallineamento completo di tutte le 15 pagine della wiki Obsidian allo stato reale del codice | Locale |
+| 37 | `551e364` | Fix | Ripristino stato `idle` in `LibraryService.checkTree()` durante l'import in background del Bestiario (mostra `bestiaryStatus`) | Locale |
 
 ### Risultato misurato complessivo (inclusi Bestiario e Schede)
 
-| Metrica | Prima (`3350707`) | Dopo tutti gli interventi (`d52912c`) | Miglioramento |
+| Metrica | Prima (`3350707`) | Dopo tutti gli interventi (`551e364`) | Miglioramento |
 |---|---:|---:|---:|
-| **Bundle iniziale (raw)** | `788.10 kB` | `384.66 kB` | **-51,2%** |
-| **Bundle iniziale (transfer)** | `199.33 kB` | `107.41 kB` | **-46,1%** |
+| **Bundle iniziale (raw)** | `788.10 kB` | `384.72 kB` | **-51,2%** |
+| **Bundle iniziale (transfer)** | `199.33 kB` | `107.36 kB` | **-46,1%** |
 | **Tempo di build** | `4.36 s` | `2.42 s` | **-44,5%** |
 | **Peso totale snapshot** | `158.96 MB` (12 file) | `121.33 MB` (10 file) | **-23,7% (-37,6 MB)** |
 | **Snapshot attesi al primo login** | `158.96 MB` (tutti) | `15.20 MB` (solo Core; Bestiario in background) | **-90,4%** |
@@ -408,6 +410,22 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 - **Messaggio:** `Refactor: remove unused availableLetters disabled filter in Bestiary alpha bar`
 - **File modificati:** `src/app/bestiary.component.ts`, `src/styles.css` (`+1 / -10`)
 - **Modifica:** Rimossi il segnale `availableLetters`, l'attributo `[disabled]` sui pulsanti `.alpha` e la regola CSS `.alpha:disabled`: con ~2.080 creature estratte tutte le 27 lettere (`A`–`Z` e `#`) sono sempre popolate, semplificando il codice.
+
+---
+
+### 36. `a660d8d` — Riallineamento completo della wiki Obsidian
+- **Messaggio:** `Docs: fully align all Obsidian wiki pages with current codebase and commit log`
+- **File modificati:** tutte le 15 pagine in `wiki/` (`+233 / -124`)
+- **Modifica:** Aggiornati architettura, diagrammi Mermaid, mappe file/modelli/storage, funzionalità Bestiario + Generatore incontri, `custom-entries.ts`, `image-compress.ts`, `localStorage` multi-tab, snapshot `core`/`bestiary` e registro commit.
+
+---
+
+### 37. `551e364` — Ripristino stato `idle` durante l'import in background del Bestiario
+- **Messaggio:** `Fix: clear checking status while background bestiary snapshot import runs`
+- **File modificati:** `src/app/library.service.ts` (`+4`)
+- **Problema:** Quando `checkTree()` terminava il controllo della struttura Drive senza documenti Core stale mentre `snapshot-bestiary-1..8.jsonl` stava ancora scaricando in background, `status` restava fermo su `'checking'` (*"Controllo il Drive…"*), nascondendo `bestiaryStatus` nella barra `.sync` di `ShellComponent`.
+- **Modifica:** Se `!coreStale.length`, reimpostati subito `status = 'idle'` e `statusText = ''` prima di attendere in background `pendingBestiary`.
+- **Beneficio:** La barra di stato mostra correttamente l'avanzamento `"Carico il Bestiario in background (parte N)…"` al primo accesso.
 
 ---
 

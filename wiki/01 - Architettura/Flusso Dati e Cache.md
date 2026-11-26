@@ -154,7 +154,7 @@ Per evitare che ogni nuovo dispositivo debba scaricare e convertire centinaia di
 
 ### Import in due fasi (`importSnapshot()`)
 - **Fase 1 (attesa al login):** carica `assets/snapshot-core-1..N.jsonl` (~15,2 MB totali), salva in IndexedDB (`snapshotCoreAt`), indicizza in `MiniSearch` e sblocca subito l'ingresso con tutte le regole, classi, feat e spell pronte.
-- **Fase 2 (in background):** avvia `startBestiaryImport()` su `assets/snapshot-bestiary-1..N.jsonl` (`snapshotBestiaryAt`), mostrando l'avanzamento in `bestiaryStatus` nella barra `.sync` e coordinandosi con `checkTree()` per evitare download duplicati dal Drive.
+- **Fase 2 (in background):** avvia `startBestiaryImport()` su `assets/snapshot-bestiary-1..N.jsonl` (`snapshotBestiaryAt`), mostrando l'avanzamento in `bestiaryStatus` nella barra `.sync` (al termine del controllo struttura in `checkTree()`, se non ci sono file Core stale, `status` torna subito a `'idle'` così `bestiaryStatus` resta visibile invece di restare coperto da *"Controllo il Drive…"*) e coordinandosi con `checkTree()` per evitare download duplicati dal Drive.
 - **Fallback legacy:** se `snapshot-core-1.jsonl` non esiste (404), ripiega automaticamente su `assets/snapshot-1..50.jsonl` (`snapshotAt`).
 - Legge lo stream riga per riga tramite `TextDecoderStream` (basso consumo RAM) e scrive i documenti mancanti in batch da 200 entry (`setMany`), salvando quanto letto nel `finally` anche in caso di interruzione.
 
