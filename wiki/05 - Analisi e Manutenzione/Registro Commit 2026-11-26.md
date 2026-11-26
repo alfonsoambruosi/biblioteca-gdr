@@ -46,6 +46,13 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 17 | `63faf28` | Fix (QA) | Gestito fallback `200 text/html` in `importSeries()`, `try/finally` su login e titoli rotte | Pushato |
 | 18 | `1805187` | Perf (QA) | `IntersectionObserver` per `linkNames()` su documenti lunghi + `content-visibility: auto` su `.content > p` | Pushato |
 | 19 | `cf8e3ec` | Feature | Aggiunta voce metamagica editoriale `Effect-Specific Spell [Metamagic]` con esempi e Editor's Note | Pushato |
+| 20 | `a2c2bda` | Docs | Aggiornato registro commit con fix QA e `Effect-Specific Spell` | Pushato |
+| 21 | `ee262bc` | Docs | Aggiunte proposte refactoring `custom-entries` e `Ch 8+8a` nelle evoluzioni future | Pushato |
+| 22 | `af65b85` | Feature | Nuovo Bestiario filtrabile (`/bestiario`) con barra CR a doppio cursore, filtri ordinati, A–Z e vista cartelle | Pushato |
+| 23 | `c575723` | Feature | Generatore di incontri casuali nel Bestiario con difficoltà DOOM (`−1..+5`, *I'm just a baby boy* → *Dante Must Die*) | Pushato |
+| 24 | `c11340c` | UX | Persistenza stato Bestiario/Incontro (`BestiaryStateService`), sync `<select>` e pulsante *← Torna* in `DocComponent` | Pushato |
+| 25 | `fa0be28` | UX | Sessione in `localStorage` tra schede + fix race condition `loadCache()`/`getHtml()` all'apertura diretta di `/doc/:id` | Pushato |
+| 26 | `c47a005` | Feature | Espansione per singola creatura (`~2.075` voci) + regex CR a fine riga + link diretti `#s-N` + ricerca per nome | Pushato |
 
 ### Risultato misurato complessivo (Tier 1 + Tier 2 + Tier 3)
 
@@ -270,6 +277,41 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 - **Problema:** `Effect-Specific Spell` compare in decine di formule di `Ch 8 + 8a` ma non ha una sezione propria nei documenti del Drive, quindi cliccandoci non compariva alcuna descrizione dedicata.
 - **Modifica:** Creato il registro estensibile `src/app/custom-entries.ts` (indipendente dal Drive e dagli snapshot, così non viene mai sovrascritto) con `Effect-Specific Spell [Metamagic]` nello stile di `Creature-Specific Spell` (`Prerequisite`, `Benefit` con esempi reali da *Illusory Wall*, *Divine Favor* e *Zone of Truth*, `Metamagic Cost: -1 to -2 levels`, `Special` ed *Editor's Note* in inglese). Integrato in `LookupService`, `LibraryService` (auto-linking, ricerca globale e documento virtuale `site:custom-metamagic`) e nel calcolatore `/oggetti` (Metamagia con `-2 livelli`).
 - **Beneficio:** Cliccando `Effect-Specific Spell` in qualsiasi formula, testo, ricerca o calcolatore compare subito la sua scheda completa.
+
+---
+
+### 22. `af65b85` — Nuovo Bestiario filtrabile (`/bestiario`) con barra CR a doppio cursore
+- **Messaggio:** `Feature: add filterable Bestiary explorer (/bestiario) with CR range slider, ordered filters, A-Z, and folder view`
+- **File modificati:** `src/app/bestiary-index.ts`, `src/app/bestiary.component.ts`, `src/app/app.routes.ts`, `src/app/home.component.ts`, `src/app/folder.component.ts`, `src/styles.css` (`+755`)
+- **Modifica:** Nuova pagina lazy `/bestiario` con card dedicata in Home, link rapido da `Manuale › Bestiary`, switch **Catalogo filtrabile / Per cartelle**, filtri ordinati (`Ordina per` → `Tipo` / `Sottocategoria` → `Ambiente` → `Taglia` → barra `Grado di Sfida (CR)` a doppio cursore `1/8`–`30+`), barra alfabetica A–Z, badge CR e paginazione incrementale.
+
+---
+
+### 23. `c575723` — Generatore di incontri casuali nel Bestiario con livelli DOOM
+- **Messaggio:** `Feature: add random encounter generator tab to Bestiary with DOOM difficulty tiers (-1 to +5)`
+- **File modificati:** `src/app/encounter-gen.ts`, `src/app/bestiary.component.ts`, `src/styles.css` (`+582 / -2`)
+- **Modifica:** Aggiunta la scheda **Generatore incontri** tra *Catalogo filtrabile* e *Per cartelle* con motore XP Pathfinder 1e/3.5 basato su numero giocatori (`1–12`), livello medio (`1–20`), 7 difficoltà (`I'm just a baby boy` `−1`, `I'm Too Young to Die` `+0`, `Hey, Not Too Rough` `+1`, `Hurt Me Plenty` `+2`, `Ultra-Violence` `+3`, `Nightmare!` `+4`, `Dante Must Die` `+5`), composizioni (`Casuale`, `Boss singolo`, `Piccolo gruppo`, `Boss + gregari`, `Orda`), filtri creatura, pulsanti `−`/`+` e **Cambia** per singolo slot.
+
+---
+
+### 24. `c11340c` — Persistenza stato Bestiario/Incontro e pulsante *Torna* nelle schede
+- **Messaggio:** `UX: persist Bestiary and generated encounter state across navigation and add back button in doc view`
+- **File modificati:** `src/app/bestiary-state.service.ts`, `src/app/bestiary.component.ts`, `src/app/doc.component.ts`, `src/styles.css` (`+109 / -56`)
+- **Modifica:** Stato completo di Catalogo e Generatore salvato in `BestiaryStateService`, sincronizzazione `[selected]` sulle `<option>` di tutti i `<select>`, default difficoltà `Hey, Not Too Rough (+1)` e pulsante contestuale **← Torna all’incontro generato** / **← Torna al Bestiario** in cima a `DocComponent`.
+
+---
+
+### 25. `fa0be28` — Sessione condivisa tra schede (`localStorage`) e fix race condition
+- **Messaggio:** `UX: persist auth session in localStorage across tabs and wait for cache before reading docs`
+- **File modificati:** `src/app/auth.service.ts`, `src/app/library.service.ts` (`+37 / -12`)
+- **Modifica:** Spostata la sessione `bgdr-session` su `localStorage` con sincronizzazione `storage` tra schede; in `LibraryService`, `setTree()` viene chiamato solo dopo il caricamento dei `meta:*` da IndexedDB e `getHtml()` attende `loadCache()` con fallback sicuro alla copia salvata se Drive fallisce o manca la chiave API.
+
+---
+
+### 26. `c47a005` — Espansione per singola creatura, regex CR a fine riga e ricerca per nome
+- **Messaggio:** `Feature: expand Bestiary per creature with EOL CR regex, direct anchors, and name-first search`
+- **File modificati:** `src/app/bestiary-index.ts`, `src/app/bestiary.component.ts`, `src/app/encounter-gen.ts` (`+189 / -84`)
+- **Modifica:** Raffinata la regex CR a fine riga (`/(?:^|\s)CR\s*(\d+(?:\/\d+)?|[½¼⅓⅛])\s*$/gim`), espanse le 629 schede in ~2.075 singole creature con link diretto `#s-N` (e sottotitolo `in <Documento>`), deduplicazione per `docId#anchor` nel Generatore, e ricerca del Catalogo ristretta a nome creatura (in cima) seguita dalle creature in pagine con quel nome.
 
 ---
 
