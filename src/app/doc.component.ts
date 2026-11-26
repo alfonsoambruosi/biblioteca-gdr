@@ -54,6 +54,14 @@ function writeStorage(key: string, value: string): void {
       }
 
       <div class="doc-main">
+        @if (from() === 'incontro' || from() === 'bestiario') {
+          <p class="back-row">
+            <a class="ghost" routerLink="/bestiario">
+              {{ from() === 'incontro' ? '← Torna all’incontro generato' : '← Torna al Bestiario' }}
+            </a>
+          </p>
+        }
+
         <nav class="crumbs" aria-label="Percorso">
           <a routerLink="/">Home</a>
           @for (n of crumbs(); track n.id) {
@@ -108,6 +116,10 @@ export class DocComponent {
   private linkObserver: IntersectionObserver | null = null;
 
   private id = toSignal(this.route.paramMap.pipe(map(p => p.get('id') ?? '')), {
+    initialValue: '',
+  });
+
+  readonly from = toSignal(this.route.queryParamMap.pipe(map(p => p.get('from') ?? '')), {
     initialValue: '',
   });
 

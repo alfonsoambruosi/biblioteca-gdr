@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { IconComponent, iconFor } from './icon.component';
 import { LibraryService } from './library.service';
@@ -14,18 +14,14 @@ import {
 import {
   DIFFICULTIES,
   ENCOUNTER_STYLES,
-  EncounterSlot,
-  EncounterStyle,
   encounterBudgetXp,
   estimateCrFromXp,
   generateEncounter,
   rerollSlot,
 } from './encounter-gen';
+import { BESTIARY_PAGE_SIZE, BestiaryStateService } from './bestiary-state.service';
 
-type ViewMode = 'catalog' | 'encounter' | 'folders';
-type SortMode = 'name-asc' | 'name-desc' | 'cr-asc' | 'cr-desc';
-
-const PAGE_SIZE = 100;
+const PAGE_SIZE = BESTIARY_PAGE_SIZE;
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'];
 
 function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
@@ -85,19 +81,19 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Ordina per
             <select aria-label="Ordina per" [value]="sort()" (change)="sort.set($any($event.target).value)">
-              <option value="name-asc">Nome (A → Z)</option>
-              <option value="name-desc">Nome (Z → A)</option>
-              <option value="cr-asc">CR crescente</option>
-              <option value="cr-desc">CR decrescente</option>
+              <option value="name-asc" [selected]="sort() === 'name-asc'">Nome (A → Z)</option>
+              <option value="name-desc" [selected]="sort() === 'name-desc'">Nome (Z → A)</option>
+              <option value="cr-asc" [selected]="sort() === 'cr-asc'">CR crescente</option>
+              <option value="cr-desc" [selected]="sort() === 'cr-desc'">CR decrescente</option>
             </select>
           </label>
 
           <label>
             Tipo
             <select aria-label="Tipo di creatura" [value]="category()" (change)="setCategory($any($event.target).value)">
-              <option value="">Tutti i tipi ({{ entries().length }})</option>
+              <option value="" [selected]="category() === ''">Tutti i tipi ({{ entries().length }})</option>
               @for (c of categories(); track c.name) {
-                <option [value]="c.name">{{ c.name }} ({{ c.count }})</option>
+                <option [value]="c.name" [selected]="category() === c.name">{{ c.name }} ({{ c.count }})</option>
               }
             </select>
           </label>
@@ -106,9 +102,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
             <label>
               Sottocategoria
               <select aria-label="Sottocategoria" [value]="subcategory()" (change)="setSubcategory($any($event.target).value)">
-                <option value="">Tutte</option>
+                <option value="" [selected]="subcategory() === ''">Tutte</option>
                 @for (s of subcategories(); track s.name) {
-                  <option [value]="s.name">{{ s.name }} ({{ s.count }})</option>
+                  <option [value]="s.name" [selected]="subcategory() === s.name">{{ s.name }} ({{ s.count }})</option>
                 }
               </select>
             </label>
@@ -117,9 +113,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Ambiente
             <select aria-label="Ambiente" [value]="env()" (change)="setEnv($any($event.target).value)">
-              <option value="">Tutti gli ambienti</option>
+              <option value="" [selected]="env() === ''">Tutti gli ambienti</option>
               @for (g of envGroups; track g.key) {
-                <option [value]="g.key">{{ g.label }}</option>
+                <option [value]="g.key" [selected]="env() === g.key">{{ g.label }}</option>
               }
             </select>
           </label>
@@ -127,9 +123,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Taglia
             <select aria-label="Taglia" [value]="size()" (change)="setSize($any($event.target).value)">
-              <option value="">Tutte le taglie</option>
+              <option value="" [selected]="size() === ''">Tutte le taglie</option>
               @for (sz of sizes; track sz) {
-                <option [value]="sz">{{ sz }}</option>
+                <option [value]="sz" [selected]="size() === sz">{{ sz }}</option>
               }
             </select>
           </label>
@@ -203,7 +199,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
         @for (e of visible(); track e.docId) {
           <li class="bestiary-row">
             <div class="bestiary-main">
-              <a [routerLink]="['/doc', e.docId]">
+              <a [routerLink]="['/doc', e.docId]" [queryParams]="{ from: 'bestiario' }">
                 <app-icon [name]="'dragon'" />
                 <strong>{{ e.name }}</strong>
               </a>
@@ -263,7 +259,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
             Difficoltà
             <select aria-label="Difficoltà incontro" [value]="diffOffset()" (change)="diffOffset.set(+$any($event.target).value)">
               @for (d of difficulties; track d.id) {
-                <option [value]="d.offset">{{ d.label }}</option>
+                <option [value]="d.offset" [selected]="diffOffset() === d.offset">{{ d.label }}</option>
               }
             </select>
           </label>
@@ -272,7 +268,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
             Composizione
             <select aria-label="Composizione incontro" [value]="encStyle()" (change)="encStyle.set($any($event.target).value)">
               @for (s of encounterStyles; track s.value) {
-                <option [value]="s.value">{{ s.label }}</option>
+                <option [value]="s.value" [selected]="encStyle() === s.value">{{ s.label }}</option>
               }
             </select>
           </label>
@@ -283,9 +279,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Tipo
             <select aria-label="Tipo creature per incontro" [value]="encCategory()" (change)="setEncCategory($any($event.target).value)">
-              <option value="">Tutti i tipi</option>
+              <option value="" [selected]="encCategory() === ''">Tutti i tipi</option>
               @for (c of categories(); track c.name) {
-                <option [value]="c.name">{{ c.name }} ({{ c.count }})</option>
+                <option [value]="c.name" [selected]="encCategory() === c.name">{{ c.name }} ({{ c.count }})</option>
               }
             </select>
           </label>
@@ -294,9 +290,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
             <label>
               Sottocategoria
               <select aria-label="Sottocategoria per incontro" [value]="encSubcategory()" (change)="encSubcategory.set($any($event.target).value)">
-                <option value="">Tutte</option>
+                <option value="" [selected]="encSubcategory() === ''">Tutte</option>
                 @for (s of encSubcategories(); track s.name) {
-                  <option [value]="s.name">{{ s.name }} ({{ s.count }})</option>
+                  <option [value]="s.name" [selected]="encSubcategory() === s.name">{{ s.name }} ({{ s.count }})</option>
                 }
               </select>
             </label>
@@ -305,9 +301,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Ambiente
             <select aria-label="Ambiente per incontro" [value]="encEnv()" (change)="encEnv.set($any($event.target).value)">
-              <option value="">Tutti gli ambienti</option>
+              <option value="" [selected]="encEnv() === ''">Tutti gli ambienti</option>
               @for (g of envGroups; track g.key) {
-                <option [value]="g.key">{{ g.label }}</option>
+                <option [value]="g.key" [selected]="encEnv() === g.key">{{ g.label }}</option>
               }
             </select>
           </label>
@@ -315,9 +311,9 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           <label>
             Taglia
             <select aria-label="Taglia per incontro" [value]="encSize()" (change)="encSize.set($any($event.target).value)">
-              <option value="">Tutte le taglie</option>
+              <option value="" [selected]="encSize() === ''">Tutte le taglie</option>
               @for (sz of sizes; track sz) {
-                <option [value]="sz">{{ sz }}</option>
+                <option [value]="sz" [selected]="encSize() === sz">{{ sz }}</option>
               }
             </select>
           </label>
@@ -360,7 +356,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
                 </div>
 
                 <div class="bestiary-main">
-                  <a [routerLink]="['/doc', slot.entry.docId]">
+                  <a [routerLink]="['/doc', slot.entry.docId]" [queryParams]="{ from: 'incontro' }">
                     <app-icon [name]="'dragon'" />
                     <strong>{{ slot.entry.name }}</strong>
                   </a>
@@ -408,6 +404,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
 export class BestiaryComponent {
   readonly library = inject(LibraryService);
   readonly lookup = inject(LookupService);
+  private state = inject(BestiaryStateService);
   private destroyRef = inject(DestroyRef);
   readonly icon = iconFor;
 
@@ -419,30 +416,30 @@ export class BestiaryComponent {
   readonly difficulties = DIFFICULTIES;
   readonly encounterStyles = ENCOUNTER_STYLES;
 
-  readonly mode = signal<ViewMode>('catalog');
-  readonly rawQuery = signal('');
-  readonly query = signal('');
-  readonly category = signal('');
-  readonly subcategory = signal('');
-  readonly crMinIdx = signal(0);
-  readonly crMaxIdx = signal(CR_OPTIONS.length - 1);
-  readonly env = signal('');
-  readonly size = signal('');
-  readonly letter = signal('');
-  readonly sort = signal<SortMode>('name-asc');
-  readonly limit = signal(PAGE_SIZE);
+  // Stato persistente nella sessione (sopravvive alla navigazione avanti/indietro verso le schede)
+  readonly mode = this.state.mode;
+  readonly rawQuery = this.state.rawQuery;
+  readonly query = this.state.query;
+  readonly category = this.state.category;
+  readonly subcategory = this.state.subcategory;
+  readonly crMinIdx = this.state.crMinIdx;
+  readonly crMaxIdx = this.state.crMaxIdx;
+  readonly env = this.state.env;
+  readonly size = this.state.size;
+  readonly letter = this.state.letter;
+  readonly sort = this.state.sort;
+  readonly limit = this.state.limit;
 
-  // Stato del generatore di incontri
-  readonly players = signal(4);
-  readonly partyLevel = signal(5);
-  readonly diffOffset = signal(0);
-  readonly encStyle = signal<EncounterStyle>('random');
-  readonly encCategory = signal('');
-  readonly encSubcategory = signal('');
-  readonly encEnv = signal('');
-  readonly encSize = signal('');
-  readonly encSlots = signal<EncounterSlot[]>([]);
-  readonly encTried = signal(false);
+  readonly players = this.state.players;
+  readonly partyLevel = this.state.partyLevel;
+  readonly diffOffset = this.state.diffOffset;
+  readonly encStyle = this.state.encStyle;
+  readonly encCategory = this.state.encCategory;
+  readonly encSubcategory = this.state.encSubcategory;
+  readonly encEnv = this.state.encEnv;
+  readonly encSize = this.state.encSize;
+  readonly encSlots = this.state.encSlots;
+  readonly encTried = this.state.encTried;
 
   readonly crActive = computed(() => this.crMinIdx() > 0 || this.crMaxIdx() < this.crMaxIndex);
   readonly crMinPct = computed(() => (this.crMinIdx() / this.crMaxIndex) * 100);

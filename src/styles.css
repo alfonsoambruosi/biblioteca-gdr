@@ -299,7 +299,8 @@ input.num { width: 5.5rem; }
 
 /* bestiario filtrabile */
 .bestiary-banner { margin: 0.4rem 0 0.7rem; }
-.bestiary-banner a { display: inline-block; text-decoration: none; }
+.bestiary-banner a, .back-row a { display: inline-block; text-decoration: none; }
+.back-row { margin: 0 0 0.5rem; }
 .bestiary-filters {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
