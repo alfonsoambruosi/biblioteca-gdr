@@ -435,3 +435,6 @@ input.num { width: 5.5rem; }
 .qty-btn { padding: 0.15rem 0.5rem; font-size: 0.95rem; line-height: 1.2; }
 .qty-val { min-width: 2rem; text-align: center; font-family: Cinzel, Georgia, serif; color: var(--wax); }
 .enc-slot-right { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }
+
+/* Scheda personaggio (Google Sheets incorporato) */
+.page:has(.sheet-wrap) { max-width: none; }

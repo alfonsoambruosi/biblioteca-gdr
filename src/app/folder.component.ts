@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { IconComponent, iconFor } from './icon.component';
 import { LibraryService } from './library.service';
-import { LookupService, isDocNode } from './lookup.service';
+import { LookupService, isDocNode, isSheetNode } from './lookup.service';
 import { BestiarySearchComponent } from './bestiary-search.component';
 
 @Component({
@@ -44,7 +44,7 @@ import { BestiarySearchComponent } from './bestiary-search.component';
       @if (files().length) {
         <ul class="list">
           @for (d of files(); track d.id) {
-            <li><a [routerLink]="['/doc', d.id]"><app-icon [name]="icon(d.name, false)" />{{ d.name }}</a></li>
+            <li><a [routerLink]="[d.kind === 'gsheet' ? '/scheda' : '/doc', d.id]"><app-icon [name]="d.kind === 'gsheet' ? 'people' : icon(d.name, false)" />{{ d.name }}</a></li>
           }
         </ul>
       } @else if (!folders().length) {
@@ -85,5 +85,5 @@ export class FolderComponent {
     (this.folder()?.children ?? []).filter(c => c.kind === 'folder')
   );
 
-  readonly files = computed(() => (this.folder()?.children ?? []).filter(c => isDocNode(c)));
+  readonly files = computed(() => (this.folder()?.children ?? []).filter(c => isDocNode(c) || isSheetNode(c)));
 }

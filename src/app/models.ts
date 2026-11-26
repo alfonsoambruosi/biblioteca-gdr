@@ -1,4 +1,4 @@
-export type NodeKind = 'folder' | 'docx' | 'gdoc' | 'text' | 'other';
+export type NodeKind = 'folder' | 'docx' | 'gdoc' | 'text' | 'gsheet' | 'other';
 
 export interface TreeNode {
   id: string;

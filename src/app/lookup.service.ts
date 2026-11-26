@@ -30,6 +30,11 @@ export function isDocNode(n: TreeNode): boolean {
   return n.kind === 'docx' || n.kind === 'gdoc' || n.kind === 'text';
 }
 
+/** Google Sheets (schede personaggio): si aprono incorporati, non vengono letti ne' indicizzati. */
+export function isSheetNode(n: TreeNode): boolean {
+  return n.kind === 'gsheet';
+}
+
 @Injectable({ providedIn: 'root' })
 export class LookupService {
   private library = inject(LibraryService);
@@ -45,7 +50,7 @@ export class LookupService {
 
   /** Numero di documenti leggibili contenuti in un nodo (ricorsivo). */
   countFiles(n: TreeNode): number {
-    if (n.kind !== 'folder') return isDocNode(n) ? 1 : 0;
+    if (n.kind !== 'folder') return isDocNode(n) || isSheetNode(n) ? 1 : 0;
     return (n.children ?? []).reduce((a, c) => a + this.countFiles(c), 0);
   }
 

@@ -5,6 +5,7 @@ import { NodeKind, TreeNode } from './models';
 const API = 'https://www.googleapis.com/drive/v3';
 const MIME_FOLDER = 'application/vnd.google-apps.folder';
 const MIME_GDOC = 'application/vnd.google-apps.document';
+const MIME_GSHEET = 'application/vnd.google-apps.spreadsheet';
 const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 interface DriveFile {
@@ -152,6 +153,7 @@ export class DriveService {
   private kindOf(f: DriveFile): NodeKind {
     if (f.mimeType === MIME_FOLDER) return 'folder';
     if (f.mimeType === MIME_GDOC) return 'gdoc';
+    if (f.mimeType === MIME_GSHEET) return 'gsheet';
     if (f.mimeType === MIME_DOCX || /\.docx$/i.test(f.name)) return 'docx';
     if (f.mimeType.startsWith('text/') || /\.(md|txt)$/i.test(f.name)) return 'text';
     return 'other';

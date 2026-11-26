@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { IconComponent, iconFor } from './icon.component';
 import { LibraryService } from './library.service';
-import { LookupService, isDocNode } from './lookup.service';
+import { LookupService, isDocNode, isSheetNode } from './lookup.service';
 
 @Component({
   selector: 'app-home',
@@ -61,7 +61,7 @@ import { LookupService, isDocNode } from './lookup.service';
       <h2>Altri file</h2>
       <ul class="list">
         @for (f of looseFiles(); track f.id) {
-          <li><a [routerLink]="['/doc', f.id]"><app-icon [name]="icon(f.name, false)" />{{ f.name }}</a></li>
+          <li><a [routerLink]="[f.kind === 'gsheet' ? '/scheda' : '/doc', f.id]"><app-icon [name]="f.kind === 'gsheet' ? 'people' : icon(f.name, false)" />{{ f.name }}</a></li>
         }
       </ul>
     }
@@ -77,6 +77,6 @@ export class HomeComponent {
   );
 
   readonly looseFiles = computed(() =>
-    (this.library.tree()?.children ?? []).filter(c => isDocNode(c))
+    (this.library.tree()?.children ?? []).filter(c => isDocNode(c) || isSheetNode(c))
   );
 }

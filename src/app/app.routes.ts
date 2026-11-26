@@ -19,6 +19,7 @@ export const routes: Routes = [
       { path: '', component: HomeComponent, title: 'Biblioteca GDR' },
       { path: 'cartella/:id', loadComponent: () => import('./folder.component').then(m => m.FolderComponent), title: 'Cartella · Biblioteca GDR' },
       { path: 'doc/:id', loadComponent: () => import('./doc.component').then(m => m.DocComponent), title: 'Documento · Biblioteca GDR' },
+      { path: 'scheda/:id', loadComponent: () => import('./sheet.component').then(m => m.SheetComponent), title: 'Scheda personaggio · Biblioteca GDR' },
       { path: 'cerca', loadComponent: () => import('./search.component').then(m => m.SearchComponent), title: 'Ricerca · Biblioteca GDR' },
       { path: 'incantesimi', loadComponent: () => import('./spellbook.component').then(m => m.SpellbookComponent), title: 'Incantesimi · Biblioteca GDR' },
       { path: 'bestiario', loadComponent: () => import('./bestiary.component').then(m => m.BestiaryComponent), title: 'Bestiario · Biblioteca GDR' },
