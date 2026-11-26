@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock-up v4 — Forgia Oggetti &amp; Costruttore Spell (Biblioteca GDR)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    #parchment-root[data-theme="parchment"] {
+      --p-bg: #d2b87f;
+      --p-panel: rgba(232, 214, 170, 0.92);
+      --p-panel-dark: #bfa068;
+      --p-popover: #f3e5c0;
+      --p-input: rgba(245, 234, 202, 0.9);
+      --p-line: rgba(78, 52, 24, 0.52);
+      --p-ink: #261b10;
+      --p-muted: #55402a;
+      --p-wax: #6e2018;
+      --p-wax-hover: #8a2d20;
+      --p-cream: #ecdcb4;
+      --p-used-bar: #6b5335;
+      background: radial-gradient(ellipse at 50% 35%, #dec692 0%, #c8ab70 70%, #b39256 100%);
+      color: var(--p-ink);
+      font-family: Georgia, 'Palatino Linotype', 'Book Antiqua', serif;
+    }
+    #parchment-root[data-theme="host"] {
+      --p-bg: var(--background);
+      --p-panel: var(--card);
+      --p-panel-dark: var(--sidebar);
+      --p-popover: var(--card);
+      --p-input: var(--background);
+      --p-line: var(--border);
+      --p-ink: var(--foreground);
+      --p-muted: var(--muted-foreground);
+      --p-wax: var(--primary);
+      --p-wax-hover: var(--primary);
+      --p-cream: var(--primary-foreground);
+      --p-used-bar: var(--muted-foreground);
+    }
+    .gdr-serif-title {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-variant: small-caps;
+      letter-spacing: 0.04em;
+    }
+    .gdr-card {
+      background: var(--p-panel);
+      border: 1px solid var(--p-line);
+      box-shadow: inset 0 0 0 2px rgba(236, 220, 180, 0.22);
+    }
+    .gdr-input { background: var(--p-input); border: 1px solid var(--p-line); color: var(--p-ink); }
+    .gdr-chip { border: 1px solid var(--p-line); color: var(--p-ink); background: transparent; }
+    .gdr-chip.on { background: var(--p-wax); color: var(--p-cream); border-color: var(--p-wax); }
+    .gdr-btn-primary { background: var(--p-wax); color: var(--p-cream); border: 1px solid var(--p-wax); }
+    .gdr-btn-primary:hover { background: var(--p-wax-hover); }
+    .gdr-btn-ghost { border: 1px solid var(--p-line); color: var(--p-ink); background: transparent; }
+    .gdr-btn-ghost:hover { border-color: var(--p-wax); color: var(--p-wax); }
+    .has-tip { border-bottom: 1px dotted var(--p-wax); cursor: help; }
+    .gdr-link { color: var(--p-wax); text-decoration: underline dotted; cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body class="m-0 p-0 antialiased">
+  <div id="parchment-root" data-theme="parchment" class="min-h-screen p-4 md:p-6 pb-48 transition-colors">
+    <div class="max-w-5xl mx-auto space-y-4">
+
+      <!-- Top info -->
+      <div class="flex flex-wrap items-center justify-between gap-2 text-xs" style="color: var(--p-muted)">
+        <div>
+          <span style="color: var(--p-wax); font-weight:600">Home</span> › <span>Forgia Oggetti &amp; Spell</span>
+          <span class="ml-2 px-2 py-0.5 rounded-full border" style="border-color: var(--p-line)">Mock-up v4 · + Numen già in uso &amp; Modalità "Solo Spell"</span>
+        </div>
+        <button id="toggle-theme" class="gdr-btn-ghost px-2.5 py-1 rounded text-xs cursor-pointer">
+          Tema: Pergamena GDR (cambia)
+        </button>
+      </div>
+
+      <!-- Header + 2 Tab -->
+      <header class="flex flex-wrap items-end justify-between gap-3 pb-3 border-b" style="border-color: var(--p-line)">
+        <div>
+          <h1 class="text-2xl font-bold gdr-serif-title">Forgia Oggetti Magici &amp; Spell</h1>
+          <p class="text-sm mt-0.5" style="color: var(--p-muted)">
+            Progetta sia <strong>incantesimi personalizzati</strong> (Ch 8) sia <strong>oggetti magici, alchimia e materiali</strong> (Ch 6 &amp; 6a), tenendo d'occhio il tuo Numen residuo.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2" role="tablist">
+          <button data-tab="forge" class="main-tab gdr-chip on px-4 py-1.5 rounded-full text-sm font-semibold gdr-serif-title cursor-pointer">
+            Forgia &amp; Costruttore Spell
+          </button>
+          <button data-tab="compendium" class="main-tab gdr-chip px-4 py-1.5 rounded-full text-sm font-semibold gdr-serif-title cursor-pointer">
+            Compendio Ch 6 &amp; 6a
+          </button>
+        </div>
+      </header>
+
+      <!-- ============================================================ -->
+      <!-- TAB 1: FORGIA & COSTRUTTORE SPELL                            -->
+      <!-- ============================================================ -->
+      <section id="view-forge" class="space-y-4">
+
+        <!-- Testata + Numen già in uso + Barra Situazione Finale Bicolore -->
+        <div class="gdr-card rounded p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+          <div class="lg:col-span-6 space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider has-tip" data-tip="numen" style="color: var(--p-muted)">Dati Personaggio &amp; Progetto</span>
+              <div class="flex gap-1.5">
+                <button id="btn-reset-demo" class="gdr-btn-ghost px-2 py-0.5 rounded text-xs cursor-pointer">Reset esempio</button>
+                <button id="btn-clear" class="gdr-btn-ghost px-2 py-0.5 rounded text-xs cursor-pointer">Svuota parti</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+              <label class="sm:col-span-5 block text-xs" style="color: var(--p-muted)">
+                Nome oggetto / spell
+                <input id="item-name" type="text" value="Lama dell'Alba" class="gdr-input mt-1 w-full px-2.5 py-1.5 rounded text-sm" />
+              </label>
+              <label class="sm:col-span-3 block text-xs" style="color: var(--p-muted)">
+                Livello PG
+                <select id="pc-level" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm"></select>
+              </label>
+              <label class="sm:col-span-4 block text-xs" style="color: var(--p-muted)">
+                <span class="has-tip" data-tip="used-numen">Numen già in uso</span>
+                <input id="used-numen" type="number" min="0" step="100" value="12000" class="gdr-input mt-1 w-full px-2.5 py-1.5 rounded text-sm tabular-nums" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Situazione Finale (Già in uso + Nuovo oggetto) -->
+          <div class="lg:col-span-6 space-y-2 lg:pl-4 lg:border-l" style="border-color: var(--p-line)">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <div class="space-x-2 text-xs">
+                <span style="color: var(--p-muted)">Già in uso: <strong id="hdr-used" class="tabular-nums">0</strong></span>
+                <span>+</span>
+                <span>Oggetto: <strong id="hdr-item" class="tabular-nums" style="color: var(--p-wax)">0</strong></span>
+                <span>=</span>
+                <span class="text-sm">Finale: <strong id="forge-total" class="text-lg font-bold tabular-nums" style="color: var(--p-wax)">0 numen</strong></span>
+              </div>
+              <button id="btn-copy" class="gdr-btn-primary px-2.5 py-1 rounded text-xs font-semibold gdr-serif-title cursor-pointer">
+                Copia
+              </button>
+            </div>
+
+            <!-- Barra Bicolore Impilata (Già in uso + Nuovo oggetto) -->
+            <div class="relative w-full h-3.5 rounded-full overflow-hidden border flex" style="background: var(--p-input); border-color: var(--p-line)">
+              <div id="mark-min" class="absolute top-0 bottom-0 w-0.5 bg-current opacity-45 z-20" title="Soglia Min"></div>
+              <div id="mark-par" class="absolute top-0 bottom-0 w-0.5 bg-current opacity-85 z-20" title="Soglia Par"></div>
+              <div id="bar-used" class="h-full transition-all duration-200" style="background: var(--p-used-bar)" title="Numen già in uso"></div>
+              <div id="bar-item" class="h-full transition-all duration-200" title="Costo di questo oggetto"></div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span id="budget-status" class="font-semibold"></span>
+              <span id="budget-floating" class="has-tip" data-tip="floating" style="color: var(--p-muted)"></span>
+            </div>
+            <div class="flex justify-between text-xs tabular-nums" style="color: var(--p-muted)">
+              <span id="lbl-min" class="has-tip" data-tip="min-gear">Min</span>
+              <span id="lbl-par" class="has-tip" data-tip="par-gear">Par</span>
+              <span id="lbl-max" class="has-tip" data-tip="max-gear">Max (Par + Overflow)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Corpo: Sinistra Configuratore | Destra Lista Parti -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+          <!-- SINISTRA -->
+          <div class="lg:col-span-7 gdr-card rounded p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-base font-bold gdr-serif-title">
+                <span id="form-mode-title">Configura Spell o Componente</span>
+              </h2>
+              <button id="cancel-edit" class="hidden gdr-btn-ghost px-2.5 py-0.5 rounded text-xs cursor-pointer">Annulla modifica ✕</button>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5">
+              <button data-m="spell" class="mod-tab gdr-chip on px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" data-tip="tab-spell">1. Spell / Alchimia</button>
+              <button data-m="bonus" class="mod-tab gdr-chip px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" data-tip="tab-bonus">2. Bonus Numerici</button>
+              <button data-m="feat" class="mod-tab gdr-chip px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" data-tip="tab-feat">3. Talento</button>
+              <button data-m="material" class="mod-tab gdr-chip px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" data-tip="tab-mat">4. Materiale</button>
+              <button data-m="special" class="mod-tab gdr-chip px-2.5 py-1 rounded text-xs font-semibold cursor-pointer" data-tip="tab-spec">5. Speciali &amp; SR</button>
+            </div>
+
+            <!-- ================= MODULO 1: SPELL / ALCHIMIA / SOLO SPELL ================= -->
+            <div id="mform-spell" class="mform space-y-3 pt-1">
+              <!-- Spell Base -->
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                <label class="sm:col-span-8 block text-xs" style="color: var(--p-muted)">
+                  Spell base (Semi Ch 8 + Grimoire Ch 8a)
+                  <select id="sp-seed" class="gdr-input mt-1 w-full px-2.5 py-1.5 rounded text-sm">
+                    <optgroup label="Semi Base (Ch 8)">
+                      <option value="Jet of flame|0|seed">Jet of flame · liv 0 (Seme)</option>
+                      <option value="Spark of life|1|seed">Spark of life · liv 1 (Seme Divino)</option>
+                      <option value="Damage attribute|1|seed">Damage attribute · liv 1 (Seme)</option>
+                      <option value="Dimensional skip|1|seed">Dimensional skip · liv 1 (Seme)</option>
+                      <option value="Warding|3|seed">Warding · liv 3 (Seme)</option>
+                      <option value="Spell turning|7|seed">Spell turning · liv 7 (es. Reflecting)</option>
+                    </optgroup>
+                    <optgroup label="Grimoire Derivato (Ch 8a — scomponibile)">
+                      <option value="Fireball|3|grimoire|Jet of flame|0|Reach Spell:1,Shape Spell:2">Fireball · liv 3 (Grimoire Ch 8a)</option>
+                      <option value="Brilliant blade|6|grimoire|Jet of flame|0|Evocation Force:2,Ray Splitting:1,Extend Spell:3">Brilliant blade · liv 6 (Grimoire Ch 8a)</option>
+                    </optgroup>
+                  </select>
+                </label>
+                <div class="sm:col-span-4 flex gap-1.5">
+                  <button id="btn-inspect-spell" class="gdr-btn-ghost px-2.5 py-1.5 rounded text-xs cursor-pointer">[?] Manuale</button>
+                  <button id="btn-decompose" class="hidden gdr-btn-ghost px-2.5 py-1.5 rounded text-xs cursor-pointer" data-tip="decompose">Scomponi</button>
+                </div>
+              </div>
+
+              <!-- Metamagia Bidirezionale -->
+              <div class="space-y-2 pt-2 border-t" style="border-color: var(--p-line)">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-xs font-semibold has-tip" data-tip="bidir-mm" style="color: var(--p-muted)">
+                    Metamagie (+ e − supportati, es. Reach / Extend / Shape / Widen)
+                  </span>
+                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer has-tip" data-tip="synergy">
+                    <input id="sp-synergy" type="checkbox" />
+                    <span>Sinergia Metamagica</span>
+                  </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end p-2 rounded border" style="background: var(--p-input); border-color: var(--p-line)">
+                  <label class="sm:col-span-5 block text-xs" style="color: var(--p-muted)">
+                    Scegli metamagia
+                    <select id="mm-picker" class="gdr-input mt-1 w-full px-2 py-1 rounded text-xs"></select>
+                  </label>
+                  <label class="sm:col-span-5 block text-xs" style="color: var(--p-muted)">
+                    Direzione / Step (Da → A)
+                    <select id="mm-preset" class="gdr-input mt-1 w-full px-2 py-1 rounded text-xs"></select>
+                  </label>
+                  <div class="sm:col-span-2">
+                    <button id="mm-add-btn" class="gdr-btn-primary w-full py-1 rounded text-xs font-semibold cursor-pointer">+ Aggiungi</button>
+                  </div>
+                </div>
+
+                <ul id="sp-mod-list" class="divide-y text-xs" style="border-color: var(--p-line)"></ul>
+              </div>
+
+              <!-- DESTINAZIONE / ATTIVAZIONE (ora include "Solo Spell"!) -->
+              <div class="space-y-2.5 pt-2 border-t" style="border-color: var(--p-line)">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold uppercase tracking-wider" style="color: var(--p-muted)">Destinazione / Tipo di Attivazione</span>
+                  <span class="text-xs has-tip" data-tip="act-diff" style="color: var(--p-wax)">Info su Spell vs Continuo vs Comando</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <label class="sm:col-span-5 block text-xs" style="color: var(--p-muted)">
+                    <span class="has-tip" data-tip="act-diff">1. Modalità</span>
+                    <select id="sp-act" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                      <option value="spell-only">★ Solo Spell — creazione incantesimo (Ch 8)</option>
+                      <option value="use" selected>Uso attivato / Arma (500 numen)</option>
+                      <option value="continuous">Continuo — sempre attivo (1.000 numen)</option>
+                      <option value="command">A comando — richiede azione (900 numen)</option>
+                      <option value="charged">A cariche / Staff / Tech 10 car. (750)</option>
+                      <option value="scroll">Pergamena / Scroll (25 gp/numen — Ch 4)</option>
+                      <option value="potion">Pozione / Alchimia / Veleno (50 gp)</option>
+                      <option value="single">Uso singolo / Munizione / Libro Mago (50 numen)</option>
+                      <option value="mask">Masking latente sull’oggetto (25 numen)</option>
+                    </select>
+                  </label>
+
+                  <!-- Pannello Durata (Continuo / Uso attivato) -->
+                  <div id="wrap-dur" class="sm:col-span-4">
+                    <label class="block text-xs" style="color: var(--p-muted)">
+                      <span class="has-tip" data-tip="dur-rule">2. Durata / Scarica giornaliera</span>
+                      <select id="sp-dur" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                        <optgroup label="Sempre attivo (moltiplicatore durata Ch 6)">
+                          <option value="8" selected>Istantaneo (×8)</option>
+                          <option value="6">1 round (×6)</option>
+                          <option value="4">1 round / liv (×4)</option>
+                          <option value="2">1 minuto / liv (×2)</option>
+                          <option value="1.5">10 minuti / liv (×1,5)</option>
+                          <option value="1">1 ora / liv (×1)</option>
+                          <option value="1-cont">Contingente / [Strike] (×1)</option>
+                          <option value="0.5">Permanente, es. tattoo (×0,5)</option>
+                        </optgroup>
+                        <optgroup label="Continuo fino a scarica (es. Reflecting / Jarring)">
+                          <option value="0.2-dis">Si scarica 1/giorno (×0,2)</option>
+                          <option value="0.4-dis">Si scarica 2/giorno (×0,4)</option>
+                          <option value="0.6-dis">Si scarica 3/giorno (×0,6)</option>
+                          <option value="0.8-dis">Si scarica 4/giorno (×0,8)</option>
+                        </optgroup>
+                      </select>
+                    </label>
+                  </div>
+
+                  <!-- Pannello Usi al giorno (Comando) -->
+                  <div id="wrap-uses" class="sm:col-span-4 hidden">
+                    <label class="block text-xs" style="color: var(--p-muted)">
+                      <span class="has-tip" data-tip="cmd-rule">2. Usi al giorno (Comando)</span>
+                      <select id="sp-uses" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                        <option value="1">A volontà / ≥5 al giorno (×1)</option>
+                        <option value="0.2">1 uso / giorno (×0,2)</option>
+                        <option value="0.4">2 usi / giorno (×0,4)</option>
+                        <option value="0.6">3 usi / giorno (×0,6)</option>
+                        <option value="0.8">4 usi / giorno (×0,8)</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <!-- Pannello info quando si sceglie "Solo Spell" o moltiplicatore fisso -->
+                  <div id="wrap-fixedmult" class="sm:col-span-4 hidden">
+                    <div class="text-xs" style="color: var(--p-muted)" id="fixedmult-lbl">2. Parametro</div>
+                    <div id="fixedmult-box" class="mt-1 px-2.5 py-1.5 rounded border text-xs" style="background: var(--p-input); border-color: var(--p-line); color: var(--p-muted)"></div>
+                  </div>
+
+                  <!-- CL -->
+                  <div class="sm:col-span-3">
+                    <div class="flex items-center justify-between text-xs" style="color: var(--p-muted)">
+                      <span class="has-tip" data-tip="cl-rule">3. CL min/uso</span>
+                      <button id="sp-cl-auto" type="button" class="gdr-link text-xs">Auto</button>
+                    </div>
+                    <input id="sp-cl" type="number" min="1" max="30" value="1" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm" />
+                  </div>
+                </div>
+
+                <!-- Banner esplicativo dinamico -->
+                <div id="act-explain-banner" class="p-2 rounded border text-xs" style="background: var(--p-input); border-color: var(--p-line); color: var(--p-muted)"></div>
+
+                <label id="sp-latent-wrap" class="inline-flex items-center gap-1.5 text-xs cursor-pointer has-tip" data-tip="latent-extra" style="color: var(--p-muted)">
+                  <input id="sp-latent" type="checkbox" />
+                  <span>+ Effetto latente aggiuntivo in attesa di innesco (<code>+50 × liv × CL</code>)</span>
+                </label>
+              </div>
+
+              <!-- Box Pozioni/Alchimia gp -> Numen -->
+              <div id="gp-mode-box" class="hidden p-2.5 rounded border space-y-2 text-xs" style="background: var(--p-input); border-color: var(--p-line)">
+                <div class="font-semibold">Conteggio nel Numen del PG (Ch 6 — Expendable Items):</div>
+                <div class="flex flex-wrap items-center gap-4">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer has-tip" data-tip="gp-doses">
+                    <input type="radio" name="gp-mode" value="doses" checked />
+                    <span>Dosi singole nello zaino (<code>1 gp = 1 numen</code>) ×</span>
+                    <input id="gp-qty" type="number" min="1" max="99" value="1" class="gdr-input w-14 px-1.5 py-0.5 rounded text-xs" />
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer has-tip" data-tip="gp-stock">
+                    <input type="radio" name="gp-mode" value="stock" />
+                    <span>Scorta privata a volontà (<strong>×18</strong>)</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Risultato Live (cambia aspetto in modalità Solo Spell!) -->
+              <div class="p-3 rounded border flex flex-wrap items-center justify-between gap-3" style="background: var(--p-input); border-color: var(--p-line)">
+                <div class="space-y-0.5 min-w-0 flex-1">
+                  <div class="text-xs" style="color: var(--p-muted)">
+                    Livello finale <strong id="sp-res-lvl"></strong> · <span id="sp-res-formula" class="font-mono break-words"></span>
+                  </div>
+                  <div id="sp-res-main" class="text-lg font-bold tabular-nums" style="color: var(--p-wax)"></div>
+                  <div id="sp-res-sub" class="text-xs" style="color: var(--p-muted)"></div>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-1.5 shrink-0">
+                  <button id="btn-copy-spell" class="hidden gdr-btn-ghost px-3 py-2 rounded text-xs font-semibold cursor-pointer">
+                    Copia Formula Spell
+                  </button>
+                  <button id="btn-commit-spell" class="gdr-btn-primary px-3.5 py-2 rounded text-xs font-semibold gdr-serif-title cursor-pointer">
+                    + Aggiungi all'oggetto
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ================= ALTRI MODULI (2..5) ================= -->
+            <div id="mform-bonus" class="mform hidden space-y-3 pt-1">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <label class="sm:col-span-7 block text-xs" style="color: var(--p-muted)">
+                  <span class="has-tip" data-tip="bundled">Tipo di Bonus Numerico (bonus² × mult)</span>
+                  <select id="bn-type" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                    <option value="2000|5|Arma magica bundled">Arma magica bundled (+1..+5) · ×2.000</option>
+                    <option value="1000|10|Armatura / Scudo bundled">Armatura / Scudo bundled (+1..+10) · ×1.000</option>
+                    <option value="1000|6|Enhancement Attributo">Enhancement Attributo · ×1.000</option>
+                    <option value="400|10|Enhancement Abilità">Abilità (intera abilità) · ×400</option>
+                    <option value="1000|5|Resistance ai TS">Resistance (TS) · ×1.000</option>
+                    <option value="2000|5|Deflection alla CA">Deflection (CA) · ×2.000</option>
+                    <option value="2500|5|Insight">Insight (CA / Att / Iniz.) · ×2.500</option>
+                    <option value="5000|5|Luck">Luck (Att / Danni / TS) · ×5.000</option>
+                  </select>
+                </label>
+                <label class="sm:col-span-2 block text-xs" style="color: var(--p-muted)">
+                  Bonus (+X)
+                  <input id="bn-val" type="number" min="1" max="10" value="2" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm" />
+                </label>
+                <label class="sm:col-span-3 block text-xs" style="color: var(--p-muted)">
+                  Condizione
+                  <select id="bn-cond" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                    <option value="1">Sempre (×1)</option>
+                    <option value="0.5">Contingente (×0,5)</option>
+                    <option value="0.25">1 solo TS (×0,25)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="p-3 rounded border flex items-center justify-between gap-2" style="background: var(--p-input); border-color: var(--p-line)">
+                <div id="bn-preview" class="text-sm font-semibold"></div>
+                <button id="btn-commit-bonus" class="gdr-btn-primary px-3.5 py-1.5 rounded text-xs font-semibold gdr-serif-title cursor-pointer">+ Aggiungi all'oggetto</button>
+              </div>
+            </div>
+
+            <div id="mform-feat" class="mform hidden space-y-3 pt-1">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <label class="sm:col-span-6 block text-xs" style="color: var(--p-muted)">
+                  Formula Talento (Ch 6)
+                  <select id="ft-mode" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                    <option value="std">Standard (2.000 × BAB o gradi)</option>
+                    <option value="rod">Metamagic Rod (2.000 × CL min)</option>
+                    <option value="rounds">Round extra (2.000 + 1.000×(r−1))</option>
+                    <option value="nonmetal">Non-metallic (fisso 8.000)</option>
+                  </select>
+                </label>
+                <label class="sm:col-span-6 block text-xs" style="color: var(--p-muted)">
+                  Talento
+                  <input id="ft-name" type="text" value="Improved Critical (Keen)" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm" />
+                </label>
+                <label class="sm:col-span-6 block text-xs" style="color: var(--p-muted)">
+                  Prerequisito (BAB / gradi / CL)
+                  <input id="ft-req" type="number" min="1" max="20" value="6" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm" />
+                </label>
+                <label class="sm:col-span-6 block text-xs" style="color: var(--p-muted)">
+                  Moltiplicatore
+                  <select id="ft-mult" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                    <option value="1">Standard (×1)</option>
+                    <option value="0.5">Contingente (×0,5)</option>
+                    <option value="1.5">Rod 3/gg (×1,5)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="p-3 rounded border flex items-center justify-between gap-2" style="background: var(--p-input); border-color: var(--p-line)">
+                <div id="ft-preview" class="text-sm font-semibold"></div>
+                <button id="btn-commit-feat" class="gdr-btn-primary px-3.5 py-1.5 rounded text-xs font-semibold gdr-serif-title cursor-pointer">+ Aggiungi all'oggetto</button>
+              </div>
+            </div>
+
+            <div id="mform-material" class="mform hidden space-y-3 pt-1">
+              <label class="block text-xs" style="color: var(--p-muted)">
+                Materiale Speciale (37 materiali Ch 6 &amp; Ch 6a)
+                <select id="mt-sel" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                  <option value="Mithral (Arma)|7250|+5 durezza, DR/argento, Finesse">Mithral — Arma · 7.250 numen</option>
+                  <option value="Mithral (Armatura/Scudo)|13450|+5 durezza, -3 ACP, +2 Max Dex, -10% ASF, -50% peso">Mithral — Armatura/Scudo · 13.450 numen</option>
+                  <option value="Adamantine (Arma)|11100|+10 durezza, +5 HP, ignora 20 durezza & DR/adamantio">Adamantine — Arma · 11.100 numen</option>
+                  <option value="Cold Iron (Arma)|6500|Penetra DR/cold iron + Unskittering (+2)">Cold Iron — Arma · 6.500 numen</option>
+                </select>
+              </label>
+              <div class="p-3 rounded border flex items-center justify-between gap-2" style="background: var(--p-input); border-color: var(--p-line)">
+                <div id="mt-preview" class="text-xs"></div>
+                <button id="btn-commit-mat" class="gdr-btn-primary px-3.5 py-1.5 rounded text-xs font-semibold gdr-serif-title cursor-pointer">+ Aggiungi all'oggetto</button>
+              </div>
+            </div>
+
+            <div id="mform-special" class="mform hidden space-y-3 pt-1">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <label class="sm:col-span-8 block text-xs" style="color: var(--p-muted)">
+                  Regola Speciale
+                  <select id="sc-type" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm">
+                    <option value="sr-amulet">Spell Resistance — Amulet of SR (90k @ SR 25 ± 10k/pt)</option>
+                    <option value="sr-cha">Spell Resistance — Carisma portatore (132k @ SR 25 ± 12k/pt)</option>
+                    <option value="speed">Velocità (+5 ft. × 250)</option>
+                    <option value="eres">Resistenza energia (punti × 1.200)</option>
+                    <option value="tradein">Trade-in Enhancement di Classe (credito −6k..−84k)</option>
+                  </select>
+                </label>
+                <label class="sm:col-span-4 block text-xs" style="color: var(--p-muted)">
+                  <span id="sc-lbl">Valore SR</span>
+                  <input id="sc-val" type="number" min="1" max="35" value="25" class="gdr-input mt-1 w-full px-2 py-1.5 rounded text-sm" />
+                </label>
+              </div>
+              <div class="p-3 rounded border flex items-center justify-between gap-2" style="background: var(--p-input); border-color: var(--p-line)">
+                <div id="sc-preview" class="text-sm font-semibold"></div>
+                <button id="btn-commit-spec" class="gdr-btn-primary px-3.5 py-1.5 rounded text-xs font-semibold gdr-serif-title cursor-pointer">+ Aggiungi all'oggetto</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- DESTRA: Lista Parti -->
+          <div class="lg:col-span-5 gdr-card rounded p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-bold gdr-serif-title">Parti del Progetto (<span id="parts-count">0</span>)</h2>
+              <span class="text-xs" style="color: var(--p-muted)">Costo oggetto: <strong id="parts-subtotal">0</strong></span>
+            </div>
+            <ul id="parts-list" class="divide-y" style="border-color: var(--p-line)"></ul>
+            <p id="parts-empty" class="hidden text-xs py-6 text-center" style="color: var(--p-muted)">Nessuna parte aggiunta.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- TAB 2: COMPENDIO -->
+      <section id="view-compendium" class="hidden space-y-4">
+        <div class="gdr-card rounded p-4 space-y-3">
+          <h2 class="text-base font-bold gdr-serif-title">Compendio Unificato (Ch 6 &amp; Ch 6a — Esempi chiave)</h2>
+          <div id="cp-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- POPOVER HOVER (~350ms) -->
+    <div id="hover-popover" role="tooltip" class="hidden fixed z-50 max-w-xs p-3 rounded shadow-xl border text-xs leading-relaxed pointer-events-none" style="background: var(--p-popover); border-color: var(--p-wax); color: var(--p-ink)">
+      <div id="pop-title" class="font-bold gdr-serif-title text-sm mb-1" style="color: var(--p-wax)"></div>
+      <div id="pop-body"></div>
+    </div>
+
+    <!-- CASSETTO INFERIORE .seed-panel -->
+    <aside id="seed-drawer" class="hidden fixed left-1/2 -translate-x-1/2 bottom-3 w-[min(760px,calc(100vw-1.5rem))] rounded shadow-2xl border z-30" style="background: var(--p-panel-dark); border-color: var(--p-line); color: var(--p-ink)">
+      <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color: var(--p-line)">
+        <strong id="drawer-title" class="gdr-serif-title text-sm">Testo del Manuale</strong>
+        <button id="drawer-close" class="gdr-btn-ghost px-2.5 py-0.5 rounded text-xs cursor-pointer">Chiudi</button>
+      </div>
+      <div id="drawer-body" class="p-4 text-sm max-h-48 overflow-y-auto space-y-1.5"></div>
+    </aside>
+
+    <div id="toast" class="fixed top-4 right-4 px-3.5 py-2 rounded shadow-lg text-xs font-semibold opacity-0 pointer-events-none transition-opacity z-40" style="background: var(--p-wax); color: var(--p-cream)"></div>
+  </div>
+
+  <script>
+    const TIPS = {
+      'used-numen': ['Numen già in uso', 'Inserisci qui la somma dei numen già vincolati agli altri tuoi oggetti magici sulla scheda. La barra a destra mostrerà in <strong>bruno</strong> i numen già occupati e in <strong>colore vivo</strong> l’aggiunta di questo oggetto, verificando la situazione finale rispetto a Min, Par e Max!'],
+      'act-diff': ['Solo Spell vs Oggetti vs Pergamene', '• <strong>★ Solo Spell (Ch 8):</strong> nessun oggetto né moltiplicatore: calcola livello, formula Grimoire e CD Sapienza Magica.<br>• <strong>Continuo (1.000):</strong> sempre attivo senza azioni (paga durata).<br>• <strong>Uso attivato (500):</strong> attivo mentre impugni/usi (paga durata).<br>• <strong>A comando (900):</strong> richiede 1 azione (paga solo usi/giorno).<br>• <strong>Pergamena / Scroll (25):</strong> metà di una pozione (Ch 4 Linguistics; CD 15+liv); se usata subito costa 0 numen, tenuta pronta pesa 25×liv×CL (o 900 per scorta a volontà).<br>• <strong>Pozione / Uso singolo / Libro Mago (50):</strong> alchimia, munizioni monouso, latent spells e trascrizioni extra Mago.'],
+      'dur-rule': ['Durata su Continuo / Uso attivato', 'Più breve è la durata base della spell resa continua, più alto è il moltiplicatore (da ×1 per 1 ora/liv fino a ×8 per istantaneo). Se è <em>Continuo fino a scarica</em> (es. Reflecting), la frazione usi/gg sostituisce la durata.'],
+      'cmd-rule': ['Usi al giorno (A Comando)', 'Attivare a comando lancia la spell per la sua durata normale: moltiplichi solo per gli usi/giorno (×1 a volontà, 0,2..0,8 per 1–4/gg). Usa <em>Extend Spell</em> sopra se vuoi allungare il singolo uso.'],
+      'bidir-mm': ['Metamagia Positiva (+) e Negativa (−)', 'Reach, Extend, Shape, Widen, Augment, Variable, Reduce e Specific possono alzare o abbassare il livello della spell.'],
+      'synergy': ['Sinergia Metamagica (Ch 8)', 'Dopo la prima metamagia con costo ≥ +1, ogni metamagia positiva successiva costa −1 livello (minimo +1).'],
+      'decompose': ['Scomponi Spell del Grimoire', 'Converte una spell derivata di Ch 8a nel suo Seme base + metamagie componenti, pronte da modificare!'],
+      'cl-rule': ['Livello dell’Incantatore (CL)', 'Impostato al minimo standard (2×liv − 1, o 1 per liv 0–1), sempre modificabile a mano.'],
+      'latent-extra': ['Effetto Latente Aggiuntivo', '+50 × liv × CL quando oltre all’effetto principale c’è una magia in attesa di condizione d’innesco (es. Healing, Determination).'],
+      'gp-doses': ['Dosi singole nello zaino (1:1)', 'Contano 1:1 sul Numen finché non vengono consumate.'],
+      'gp-stock': ['Scorta privata a volontà (×18)', 'Prezzata come oggetto a comando a volontà (50 × 18 = 900 numen × liv × CL).'],
+      'numen': ['Numen personale', 'Tetto di potere magico personale per livello. Nessun sovrapprezzo combinando proprietà!'],
+      'min-gear': ['Soglia Minima', 'Se il totale finale (già in uso + oggetto) resta sotto Min, il PG conta come CR −1.'],
+      'par-gear': ['Soglia Par', 'Equipaggiamento atteso standard (scopribile narrativamente).'],
+      'max-gear': ['Soglia Massima (Par + Overflow)', 'Limite massimo assoluto vincolabile tramite craft o bottino.'],
+      'floating': ['Floating Inventory residuo', 'Differenza rimanente sotto Par utilizzabile al volo per oggetti mondani (max 10 gp × livello per singolo oggetto).'],
+      'bundled': ['Bundled Enhancement', 'Armi (+1..+5, ×2.000) e Armature/Scudi (+1..+10, ×1.000).'],
+      'tab-spell': ['1. Spell & Alchimia', 'Crea sia incantesimi puri (Ch 8) sia effetti magici su oggetti, pozioni e veleni.'],
+      'tab-bonus': ['2. Bonus Numerici', 'Priorità #1: bonus² × moltiplicatore.'],
+      'tab-feat': ['3. Talenti su Oggetti', '2.000 numen × BAB o gradi minimi.'],
+      'tab-mat': ['4. Materiali Speciali', '37 materiali di Ch 6 & 6a.'],
+      'tab-spec': ['5. Regole Speciali & SR', 'Velocità, Resistenze, SR, Fortification, Power Conduits e Trade-in.']
+    };
+
+    const MM_CATALOG = [
+      { name: 'Reach Spell', tip: '±1 livello per step di categoria di gittata.', presets: [['Close → Touch / Personal (−1)', -1], ['Medium → Touch (−2)', -2], ['Touch → Close (+1)', 1], ['Close → Medium (+1)', 1], ['Close → Long (+2)', 2], ['Close → Interplanar (+7)', 7]] },
+      { name: 'Extend Spell', tip: 'Allunga (+1..+7) o accorcia (−1..−4) la durata.', presets: [['+1 step (+1)', 1], ['Istantaneo → 1 rd/liv (+2)', 2], ['1 rd/liv → 1 hr/liv (+3)', 3], ['Accorcia 1 step / Intervallo veleno (−1)', -1], ['1 min/liv → 1 rd (−2)', -2]] },
+      { name: 'Shape Spell', tip: 'Cambia forma dell’area da −2 a +3.', presets: [['Emanation → Target (−2)', -2], ['Ray → Target (0)', 0], ['Ray → Line (+1)', 1], ['Ray → Cone (+2)', 2], ['Ray/Target → Burst (+3)', 3]] },
+      { name: 'Widen Spell', tip: 'Allarga (+1..+4) o restringe (−1..−2) l’area.', presets: [['20 ft. → 5 ft. (−2)', -2], ['20 ft. → 10 ft. (−1)', -1], ['+1 step (+1)', 1], ['+2 step (+2)', 2]] },
+      { name: 'Channel Spell', tip: 'Trasmette la spell tramite attacco con arma (+1).', presets: [['Su colpo d’arma (+1)', 1]] },
+      { name: 'Augment Spell', tip: '+1 per step (o −1 se depotenziato).', presets: [['Depotenziato (−1)', -1], ['+1 step (+1)', 1], ['+2 step (+2)', 2]] },
+      { name: 'Reduce Spell', tip: '−1 livello per step di riduzione del cap danni/bonus.', presets: [['−1 step (−1)', -1], ['−2 step (−2)', -2], ['−3 step (−3)', -3]] },
+      { name: 'Effect-Specific Spell', tip: 'Restringe un seme ampio a un singolo effetto (−2) o tema (−1).', presets: [['Effetto singolo (−2)', -2], ['Tema bastone (−1)', -1]] },
+      { name: 'Creature-Specific Spell', tip: '1 tipo creatura / ingestione (−2) o 2 tipi (−1).', presets: [['1 tipo (−2)', -2], ['2 tipi (−1)', -1]] },
+      { name: 'Tenuous Spell', tip: 'TS ricorrente termina l’effetto (−1).', presets: [['TS ogni round (−1)', -1]] },
+      { name: 'Ritual Spell', tip: 'Full-round (−1) o rituale lungo (−2).', presets: [['Full-round (−1)', -1], ['Rituale lungo (−2)', -2]] }
+    ];
+
+    const NUMEN_TABLE = [
+      [1, 0, 500, 1500, 2000], [2, 780, 1000, 2000, 3000], [3, 1650, 2700, 3300, 6000],
+      [4, 2400, 5400, 5100, 10500], [5, 3450, 9000, 7000, 16000], [6, 4650, 13000, 10500, 23500],
+      [7, 6000, 19000, 14000, 33000], [8, 7800, 27000, 19000, 46000], [9, 10050, 36000, 26000, 62000],
+      [10, 12750, 49000, 33000, 82000], [11, 16350, 66000, 42000, 108000], [12, 21000, 88000, 52000, 140000],
+      [13, 27000, 110000, 75000, 185000], [14, 34800, 150000, 90000, 240000], [15, 45000, 200000, 115000, 315000],
+      [16, 58500, 260000, 150000, 410000], [17, 75000, 340000, 190000, 530000], [18, 96000, 440000, 245000, 685000],
+      [19, 123000, 580000, 300000, 880000], [20, 159000, 760000, 240000, 999999]
+    ];
+    const TRADEIN = [0, 6000, 13000, 20000, 28000, 37000, 47000, 58000, 70000, 84000];
+
+    const COMPENDIUM = [
+      { name: 'Boots, Winged (Comando 3/gg)', stated: 15120, note: 'Fly (4) × CL 7 × 900 × 0,6 (3/gg) = 15.120 numen.', parts: [{ m: 'spell', kind: 'Spell', label: 'Fly (Comando 3/gg)', cost: 15120, formula: '4 × CL 7 × 900 × 0,6', on: true }] },
+      { name: 'Reflecting Armor (Continuo fino a scarica 1/gg)', stated: 18200, note: 'Spell turning (7) × CL 13 × 1.000 × 0,2 = 18.200 numen.', parts: [{ m: 'spell', kind: 'Spell', label: 'Spell turning (1/gg)', cost: 18200, formula: '7 × CL 13 × 1.000 × 0,2', on: true }] }
+    ];
+
+    const fmt = n => Math.round(n).toLocaleString('it-IT');
+    const $ = id => document.getElementById(id);
+
+    // Hover popover (~350ms)
+    let popTimer = null;
+    const popEl = $('hover-popover');
+    document.addEventListener('mouseover', e => {
+      const el = e.target.closest('[data-tip]');
+      if (!el) return;
+      clearTimeout(popTimer);
+      popTimer = setTimeout(() => {
+        const entry = TIPS[el.dataset.tip];
+        if (!entry) return;
+        $('pop-title').textContent = entry[0];
+        $('pop-body').innerHTML = entry[1];
+        popEl.classList.remove('hidden');
+        const r = el.getBoundingClientRect();
+        popEl.style.left = Math.min(window.innerWidth - 320, Math.max(12, r.left)) + 'px';
+        popEl.style.top = (r.bottom + 8 + 150 > window.innerHeight ? Math.max(12, r.top - popEl.offsetHeight - 8) : r.bottom + 8) + 'px';
+      }, 340);
+    });
+    document.addEventListener('mouseout', e => { if (e.target.closest('[data-tip]')) { clearTimeout(popTimer); popEl.classList.add('hidden'); } });
+
+    function toast(msg) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.classList.remove('opacity-0');
+      clearTimeout(t._tm);
+      t._tm = setTimeout(() => t.classList.add('opacity-0'), 2200);
+    }
+
+    $('drawer-close').addEventListener('click', () => $('seed-drawer').classList.add('hidden'));
+    $('btn-inspect-spell').addEventListener('click', () => {
+      const name = $('sp-seed').value.split('|')[0];
+      $('drawer-title').textContent = name;
+      $('drawer-body').innerHTML = `<p>Testo completo di <strong>${name}</strong> da <code>LookupService</code> (Ch 8 / Ch 8a).</p>`;
+      $('seed-drawer').classList.remove('hidden');
+    });
+
+    $('toggle-theme').addEventListener('click', () => {
+      const r = $('parchment-root');
+      r.dataset.theme = r.dataset.theme === 'parchment' ? 'host' : 'parchment';
+    });
+
+    document.querySelectorAll('.main-tab').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.main-tab').forEach(x => x.classList.toggle('on', x === b));
+      $('view-forge').classList.toggle('hidden', b.dataset.tab !== 'forge');
+      $('view-compendium').classList.toggle('hidden', b.dataset.tab !== 'compendium');
+    }));
+
+    function setModTab(m) {
+      document.querySelectorAll('.mod-tab').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+      document.querySelectorAll('.mform').forEach(f => f.classList.toggle('hidden', f.id !== 'mform-' + m));
+    }
+    document.querySelectorAll('.mod-tab').forEach(b => b.addEventListener('click', () => setModTab(b.dataset.m)));
+
+    const mmPicker = $('mm-picker'), mmPreset = $('mm-preset');
+    MM_CATALOG.forEach((m, i) => {
+      TIPS['mm-' + m.name] = [m.name, m.tip];
+      const o = document.createElement('option'); o.value = i; o.textContent = m.name; mmPicker.appendChild(o);
+    });
+    function syncMmPresets() {
+      const m = MM_CATALOG[+mmPicker.value];
+      mmPreset.innerHTML = '';
+      m.presets.forEach(([label, adj]) => {
+        const o = document.createElement('option'); o.value = `${adj}|${label}`; o.textContent = label; mmPreset.appendChild(o);
+      });
+    }
+    mmPicker.addEventListener('change', syncMmPresets);
+    syncMmPresets();
+
+    let pcLevel = 8, editingIndex = null, clManual = false;
+    let spMods = [
+      { name: 'Channel Spell', note: 'Su colpo d’arma', adj: 1, on: true },
+      { name: 'Reach Spell', note: 'Close → Touch', adj: -1, on: true }
+    ];
+    let parts = [
+      { m: 'bonus', kind: 'Bonus', label: 'Arma magica bundled (+2)', cost: 8000, formula: '2² × 2.000', on: true, tip: 'bundled' },
+      { m: 'spell', kind: 'Spell', label: 'Jet of flame (Flaming +1d6)', cost: 2000, formula: '0,5 × CL 1 × 500 × 8', on: true, tip: 'act-diff' },
+      { m: 'feat', kind: 'Talento', label: 'Improved Critical / Keen (BAB +6)', cost: 12000, formula: '2.000 × 6', on: true, tip: 'tab-feat' }
+    ];
+
+    const pcSel = $('pc-level');
+    NUMEN_TABLE.forEach(([lv, , par]) => {
+      const o = document.createElement('option'); o.value = lv; o.textContent = `Liv. ${lv} (Par ${fmt(par)})`;
+      if (lv === pcLevel) o.selected = true; pcSel.appendChild(o);
+    });
+    pcSel.addEventListener('change', () => { pcLevel = +pcSel.value; renderForge(); });
+    $('used-numen').addEventListener('input', renderForge);
+
+    $('mm-add-btn').addEventListener('click', () => {
+      const m = MM_CATALOG[+mmPicker.value];
+      const [adjStr, label] = mmPreset.value.split('|');
+      spMods.push({ name: m.name, note: label.replace(/\s*\([^)]*\)\s*$/, ''), adj: +adjStr, on: true });
+      updateSpellCalc();
+    });
+
+    function effectiveMods() {
+      const syn = $('sp-synergy').checked;
+      let seenPos = false;
+      return spMods.map(m => {
+        if (!m.on || !syn || m.adj < 1) return { ...m, eff: m.adj, synApplied: false };
+        if (!seenPos) { seenPos = true; return { ...m, eff: m.adj, synApplied: false }; }
+        const eff = Math.max(1, m.adj - 1);
+        return { ...m, eff, synApplied: eff !== m.adj };
+      });
+    }
+
+    function updateSpellCalc() {
+      const seedParts = $('sp-seed').value.split('|');
+      const seedName = seedParts[0], baseLvl = +seedParts[1], seedKind = seedParts[2];
+      $('btn-decompose').classList.toggle('hidden', seedKind !== 'grimoire');
+
+      const act = $('sp-act').value;
+      const isSpellOnly = act === 'spell-only';
+      const isContOrUse = act === 'continuous' || act === 'use';
+      const isCmd = act === 'command';
+      const isPotion = act === 'potion';
+      const isScroll = act === 'scroll';
+
+      $('wrap-dur').classList.toggle('hidden', !isContOrUse);
+      $('wrap-uses').classList.toggle('hidden', !isCmd);
+      $('wrap-fixedmult').classList.toggle('hidden', isContOrUse || isCmd);
+      $('gp-mode-box').classList.toggle('hidden', !isPotion && !isScroll);
+      $('sp-latent-wrap').classList.toggle('hidden', isSpellOnly);
+      $('btn-copy-spell').classList.toggle('hidden', !isSpellOnly);
+
+      const modsEff = effectiveMods();
+      const activeMods = modsEff.filter(m => m.on);
+      const delta = activeMods.reduce((s, m) => s + m.eff, 0);
+      const lvl = Math.max(0, baseLvl + delta);
+      if (!clManual) $('sp-cl').value = lvl <= 1 ? 1 : (2 * lvl - 1);
+      const cl = Math.max(1, +$('sp-cl').value || 1);
+
+      // Build human-readable Grimoire chain
+      const chainParts = [`${seedName} (${baseLvl} liv)`];
+      activeMods.forEach(m => chainParts.push(`${m.name} (${m.eff >= 0 ? '+' + m.eff : m.eff})`));
+      const grimoireFormula = `${chainParts.join(' + ')} = ${lvl}° livello`;
+
+      if (isSpellOnly) {
+        // Ch 8 Applying Metamagic rules:
+        // Spellcraft DC = 15 + baseLvl + sum(|m.eff|, treating 0 as +1)
+        const mmAbsSum = activeMods.reduce((s, m) => s + (m.eff === 0 ? 1 : Math.abs(m.eff)), 0);
+        const spellcraftDc = activeMods.length ? (15 + baseLvl + mmAbsSum) : null;
+        const negHours = activeMods.reduce((s, m) => s + (m.eff < 0 ? Math.abs(m.eff) : 0), 0);
+
+        $('fixedmult-lbl').textContent = '2. Modalità Incantesimo';
+        $('fixedmult-box').innerHTML = 'Nessun moltiplicatore oggetto (<strong>0 numen</strong>)';
+        $('act-explain-banner').innerHTML =
+          `<strong>Modalità Costruttore Spell (Ch 8):</strong> stai progettando un incantesimo puro (non un oggetto). ` +
+          (spellcraftDc !== null ? `Per applicare queste metamagie serve <strong>Sapienza Magica CD ${spellcraftDc}</strong> (non richiesta se la spell è già appresa/trascritta pre-modificata).` : `Aggiungi metamagie sopra per modificarne portata, area, durata o potenza.`);
+
+        $('sp-res-lvl').textContent = `${lvl}° livello`;
+        $('sp-res-formula').textContent = grimoireFormula;
+        $('sp-res-main').textContent = `Incantesimo di ${lvl}° livello (CL min ${lvl <= 1 ? 1 : 2 * lvl - 1})`;
+        $('sp-res-sub').textContent = activeMods.length
+          ? `Sapienza Magica CD ${spellcraftDc}` + (negHours > 0 ? ` · +${negHours}h preparazione (metamagie negative, non spontaneo)` : '')
+          : 'Incantesimo base senza metamagie';
+        $('btn-commit-spell').textContent = '+ Salva nel Progetto (0 numen)';
+
+        renderMmList(modsEff);
+        return { m: 'spell', kind: 'Incantesimo', label: `Spell: ${seedName} (${lvl}° liv)`, cost: 0, formula: grimoireFormula, on: true, tip: 'act-diff' };
+      }
+
+      $('btn-commit-spell').textContent = editingIndex !== null ? 'Salva modifiche ✓' : "+ Aggiungi all'oggetto";
+      $('fixedmult-lbl').textContent = '2. Moltiplicatore';
+      $('fixedmult-box').innerHTML = 'Fisso <strong>×1</strong> per questa categoria';
+
+      let price = 500, mult = 1, unit = 'numen', explain = '';
+      if (isContOrUse) {
+        price = act === 'continuous' ? 1000 : 500;
+        const durVal = $('sp-dur').value;
+        mult = parseFloat(durVal);
+        explain = durVal.endsWith('-dis')
+          ? `<strong>Continuo fino a scarica:</strong> passivo, ma scaricandosi ${Math.round(mult * 5)}/gg paga <code>×${mult}</code> al posto della durata.`
+          : durVal === '1-cont'
+          ? `<strong>Contingente / [Strike]:</strong> attivandosi solo su condizioni specifiche, resta <code>×1</code>.`
+          : `<strong>${act === 'continuous' ? 'Continuo (1.000)' : 'Uso attivato (500)'}:</strong> moltiplicatore durata <code>×${mult}</code>.`;
+      } else if (isCmd) {
+        price = 900; mult = parseFloat($('sp-uses').value);
+        explain = `<strong>A comando (900):</strong> richiede 1 azione; non paga durata, solo usi/giorno (<code>×${mult}</code>).`;
+      } else if (act === 'charged') {
+        price = 750; mult = 1; explain = `<strong>A cariche / Staff / Tech (750):</strong> 10 cariche ricaricabili.`;
+      } else if (act === 'scroll') {
+        price = 25; mult = 1; unit = 'gp';
+        explain = `<strong>Pergamena / Scroll (25 — Ch 4 Linguistics):</strong> metà di una pozione! CD creazione <code>15 + liv</code> (materiali metà prezzo). Tenuta pronta pesa <code>25 × liv × CL</code> numen; per scorta illimitata a volontà vale il comando (<code>900 × liv × CL</code>). <em>Nota: per aggiungere spell extra al libro del Mago, Wizard.docx indica invece 50 × liv × CL.</em>`;
+      } else if (isPotion) {
+        price = 50; mult = 1; unit = 'gp'; explain = `<strong>Pozione / Alchimia / Veleno (50 gp):</strong> singola dose in gp, o scorta ×18 in numen.`;
+      } else if (act === 'single') {
+        price = 50; mult = 1; explain = `<strong>Uso singolo / Munizione / Libro Mago (50 numen):</strong> monouso, latent spell o spell aggiunta al libro del Mago (Wizard.docx).`;
+      } else {
+        price = 25; mult = 1; explain = `<strong>Masking latente (25 numen):</strong> protegge solo l'oggetto da divinazioni.`;
+      }
+      $('act-explain-banner').innerHTML = explain;
+
+      const effLvl = lvl === 0 ? 0.5 : lvl;
+      const latent = $('sp-latent').checked;
+      const latCost = latent ? effLvl * cl * 50 : 0;
+      const rawTotal = effLvl * cl * price * mult + latCost;
+
+      $('sp-res-lvl').textContent = lvl === 0 ? '0° (vale 0,5)' : `${lvl}°`;
+      let formula = `${effLvl} × CL ${cl} × ${fmt(price)}` + (mult !== 1 ? ` × ${mult}` : '') + (latent ? ` + ${fmt(latCost)} latente` : '');
+      $('sp-res-formula').textContent = formula;
+
+      let forgeCost = rawTotal, suffix = '';
+      if (unit === 'gp') {
+        const stockMult = Math.round(900 / price); // 18 per pozioni (50), 36 per pergamene (25) -> 900 × liv × CL
+        const gpMode = document.querySelector('input[name="gp-mode"]:checked').value;
+        const qty = Math.max(1, +$('gp-qty').value || 1);
+        const unitName = isScroll ? 'pergamena' : 'dose';
+        const unitPlural = isScroll ? 'pergamene' : 'dosi';
+        $('sp-res-main').textContent = `${fmt(rawTotal)} gp / ${unitName}`;
+        $('sp-res-sub').textContent = isScroll
+          ? `Materiali creazione: ${fmt(rawTotal / 2)} gp · Tenuta pronta (Ch 4): ${fmt(rawTotal)} numen · Scorta a volontà (Ch 6): ${fmt(rawTotal * stockMult)} numen (×${stockMult})`
+          : `Scorta privata: ${fmt(rawTotal * stockMult)} numen (×${stockMult})`;
+        if (gpMode === 'stock') { forgeCost = rawTotal * stockMult; suffix = ` (Scorta ×${stockMult})`; formula += ` × ${stockMult}`; }
+        else { forgeCost = rawTotal * qty; suffix = ` (${qty} ${qty === 1 ? unitName : unitPlural})`; if (qty > 1) formula += ` × ${qty}`; }
+      } else {
+        $('sp-res-main').textContent = `${fmt(rawTotal)} numen`;
+        $('sp-res-sub').textContent = clManual ? 'CL manuale' : `CL minimo auto (${cl})`;
+      }
+
+      renderMmList(modsEff);
+      return { m: 'spell', kind: unit === 'gp' ? 'Alchimia' : 'Spell', label: seedName + suffix, cost: forgeCost, formula, on: true, tip: 'act-diff' };
+    }
+
+    function renderMmList(modsEff) {
+      const ul = $('sp-mod-list');
+      ul.innerHTML = '';
+      modsEff.forEach((m, i) => {
+        const li = document.createElement('li');
+        li.className = 'py-1.5 flex flex-wrap items-center justify-between gap-2';
+        const tipAttr = TIPS['mm-' + m.name] ? `class="has-tip font-semibold" data-tip="mm-${m.name}"` : 'class="font-semibold"';
+        li.innerHTML = `
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" ${m.on ? 'checked' : ''} data-smt="${i}" />
+            <span ${tipAttr}>${m.name}</span>
+            ${m.note ? `<span style="color:var(--p-muted)">(${m.note})</span>` : ''}
+            ${m.synApplied ? `<span class="px-1 rounded border text-[11px]" style="border-color:var(--p-line)">sinergia ${m.adj}→+${m.eff}</span>` : ''}
+          </label>
+          <div class="flex items-center gap-1">
+            <button data-dec="${i}" class="gdr-btn-ghost px-1.5 py-0.2 rounded cursor-pointer">−</button>
+            <span class="w-8 text-center font-mono font-bold">${m.eff >= 0 ? '+' + m.eff : m.eff}</span>
+            <button data-inc="${i}" class="gdr-btn-ghost px-1.5 py-0.2 rounded cursor-pointer">+</button>
+            <button data-smd="${i}" class="gdr-btn-ghost px-1.5 py-0.2 rounded cursor-pointer ml-1">✕</button>
+          </div>`;
+        ul.appendChild(li);
+      });
+      ul.querySelectorAll('[data-smt]').forEach(cb => cb.addEventListener('change', () => { spMods[+cb.dataset.smt].on = cb.checked; updateSpellCalc(); }));
+      ul.querySelectorAll('[data-dec]').forEach(b => b.addEventListener('click', () => { spMods[+b.dataset.dec].adj -= 1; updateSpellCalc(); }));
+      ul.querySelectorAll('[data-inc]').forEach(b => b.addEventListener('click', () => { spMods[+b.dataset.inc].adj += 1; updateSpellCalc(); }));
+      ul.querySelectorAll('[data-smd]').forEach(b => b.addEventListener('click', () => { spMods.splice(+b.dataset.smd, 1); updateSpellCalc(); }));
+    }
+
+    $('sp-seed').addEventListener('change', () => { clManual = false; updateSpellCalc(); });
+    $('sp-cl').addEventListener('input', () => { clManual = true; updateSpellCalc(); });
+    $('sp-cl-auto').addEventListener('click', () => { clManual = false; updateSpellCalc(); });
+    ['sp-synergy', 'sp-act', 'sp-dur', 'sp-uses', 'sp-latent', 'gp-qty'].forEach(id => $(id).addEventListener('input', updateSpellCalc));
+    document.querySelectorAll('input[name="gp-mode"]').forEach(r => r.addEventListener('change', updateSpellCalc));
+    $('btn-copy-spell').addEventListener('click', () => {
+      navigator.clipboard?.writeText(`${$('item-name').value || 'Nuova Spell'}: ${$('sp-res-formula').textContent} (${$('sp-res-sub').textContent})`);
+      toast('Formula della Spell copiata negli appunti!');
+    });
+    $('btn-decompose').addEventListener('click', () => {
+      const p = $('sp-seed').value.split('|');
+      if (p[2] !== 'grimoire') return;
+      const idx = [...$('sp-seed').options].findIndex(o => o.value.startsWith(p[3] + '|'));
+      if (idx >= 0) $('sp-seed').selectedIndex = idx;
+      spMods = p[5].split(',').map(s => { const [n, a] = s.split(':'); return { name: n, note: 'da Grimoire', adj: +a, on: true }; });
+      clManual = false; updateSpellCalc(); toast('Spell scomposta nei componenti!');
+    });
+
+    function commitPart(part) {
+      if (editingIndex !== null) { parts[editingIndex] = part; editingIndex = null; $('cancel-edit').classList.add('hidden'); $('form-mode-title').textContent = 'Configura Spell o Componente'; toast('Parte aggiornata!'); }
+      else { parts.push(part); toast('Aggiunto al Progetto!'); }
+      renderForge();
+    }
+    $('btn-commit-spell').addEventListener('click', () => commitPart(updateSpellCalc()));
+
+    function updateBonus() {
+      const [m, mx, name] = $('bn-type').value.split('|');
+      const v = Math.max(1, Math.min(+mx, +$('bn-val').value || 1)), c = +$('bn-cond').value;
+      const cost = v * v * (+m) * c, formula = `${v}² × ${fmt(+m)}` + (c !== 1 ? ` × ${c}` : '');
+      $('bn-preview').textContent = `${formula} = ${fmt(cost)} numen`;
+      return { m: 'bonus', kind: 'Bonus', label: `${name} (+${v})`, cost, formula, on: true, tip: 'bundled' };
+    }
+    ['bn-type', 'bn-val', 'bn-cond'].forEach(id => $(id).addEventListener('input', updateBonus));
+    $('btn-commit-bonus').addEventListener('click', () => commitPart(updateBonus()));
+
+    function updateFeat() {
+      const mode = $('ft-mode').value, name = $('ft-name').value || 'Talento', r = Math.max(1, +$('ft-req').value || 1), mu = +$('ft-mult').value;
+      const cost = mode === 'nonmetal' ? 8000 : mode === 'rounds' ? (2000 + 1000 * (r - 1)) * mu : 2000 * r * mu;
+      const formula = mode === 'nonmetal' ? '8.000 fisso' : `2.000 × ${r}` + (mu !== 1 ? ` × ${mu}` : '');
+      $('ft-preview').textContent = `${formula} = ${fmt(cost)} numen`;
+      return { m: 'feat', kind: 'Talento', label: `${name} (${r})`, cost, formula, on: true, tip: 'tab-feat' };
+    }
+    ['ft-mode', 'ft-name', 'ft-req', 'ft-mult'].forEach(id => $(id).addEventListener('input', updateFeat));
+    $('btn-commit-feat').addEventListener('click', () => commitPart(updateFeat()));
+
+    function updateMat() {
+      const [l, c, n] = $('mt-sel').value.split('|');
+      $('mt-preview').innerHTML = `<strong>${fmt(+c)} numen</strong> · ${n}`;
+      return { m: 'material', kind: 'Materiale', label: l, cost: +c, formula: n, on: true, tip: 'tab-mat' };
+    }
+    $('mt-sel').addEventListener('change', updateMat);
+    $('btn-commit-mat').addEventListener('click', () => commitPart(updateMat()));
+
+    function updateSpec() {
+      const t = $('sc-type').value, v = Math.max(1, +$('sc-val').value || 1);
+      let cost = 0, formula = '', label = '';
+      if (t === 'sr-amulet') { cost = 90000 + (v - 25) * 10000; formula = `SR ${v} (90k ± 10k)`; label = `Spell Resistance ${v}`; }
+      else if (t === 'sr-cha') { cost = 132000 + (v - 25) * 12000; formula = `SR ${v}+Car (132k ± 12k)`; label = `SR ${v} + Carisma`; }
+      else if (t === 'speed') { cost = v * 250; formula = `${v} × 250`; label = `Velocità +${v * 5} ft.`; }
+      else if (t === 'eres') { cost = v * 1200; formula = `${v} × 1.200`; label = `Resistenza energia ${v}`; }
+      else { const ti = Math.min(9, v); cost = -TRADEIN[ti]; formula = `Trade-in +${ti}`; label = `Credito Trade-in (+${ti})`; }
+      $('sc-preview').textContent = `${formula} = ${cost < 0 ? '−' + fmt(Math.abs(cost)) : fmt(cost)} numen`;
+      return { m: 'special', kind: 'Speciale', label, cost, formula, on: true, tip: 'tab-spec' };
+    }
+    ['sc-type', 'sc-val'].forEach(id => $(id).addEventListener('input', updateSpec));
+    $('btn-commit-spec').addEventListener('click', () => commitPart(updateSpec()));
+
+    function renderForge() {
+      const used = Math.max(0, +$('used-numen').value || 0);
+      const itemTotal = parts.reduce((s, p) => s + (p.on ? p.cost : 0), 0);
+      const finalTotal = Math.max(0, used + itemTotal);
+
+      $('hdr-used').textContent = fmt(used);
+      $('hdr-item').textContent = (itemTotal >= 0 ? '+' : '−') + fmt(Math.abs(itemTotal));
+      $('forge-total').textContent = `${fmt(finalTotal)} numen`;
+      $('parts-count').textContent = parts.length;
+      $('parts-subtotal').textContent = `${fmt(itemTotal)} numen`;
+
+      const [, min, par, , max] = NUMEN_TABLE.find(r => r[0] === pcLevel);
+      $('mark-min').style.left = Math.min(100, (min / max) * 100) + '%';
+      $('mark-par').style.left = Math.min(100, (par / max) * 100) + '%';
+
+      const usedPct = Math.min(100, (used / max) * 100);
+      const itemPct = Math.min(100 - usedPct, Math.max(0, (itemTotal / max) * 100));
+      $('bar-used').style.width = usedPct + '%';
+      $('bar-item').style.width = itemPct + '%';
+
+      $('lbl-min').textContent = `Min: ${fmt(min)}`;
+      $('lbl-par').textContent = `Par: ${fmt(par)}`;
+      $('lbl-max').textContent = `Max: ${fmt(max)}`;
+
+      const st = $('budget-status'), fl = $('budget-floating'), barItem = $('bar-item');
+      if (finalTotal < min) {
+        st.textContent = 'Situazione finale: Sotto Min (CR −1)'; st.style.color = '#9a3412'; barItem.style.background = '#d97706';
+        fl.textContent = `Mancano ${fmt(min - finalTotal)} al Min`;
+      } else if (finalTotal <= par) {
+        st.textContent = 'Situazione finale: Entro Par (ottimale)'; st.style.color = '#166534'; barItem.style.background = '#15803d';
+        fl.textContent = `Floating Inv: ${fmt(par - finalTotal)} gp`;
+      } else if (finalTotal <= max) {
+        st.textContent = `Situazione finale: Overflow (+${fmt(finalTotal - par)} sopra Par)`; st.style.color = '#854d0e'; barItem.style.background = '#b45309';
+        fl.textContent = `Margine fino a Max: ${fmt(max - finalTotal)}`;
+      } else {
+        st.textContent = `Situazione finale: Oltre Max (+${fmt(finalTotal - max)})!`; st.style.color = '#991b1b'; barItem.style.background = '#b91c1c';
+        fl.textContent = 'Sfora il limite del PG!';
+      }
+
+      const ul = $('parts-list');
+      ul.innerHTML = '';
+      $('parts-empty').classList.toggle('hidden', parts.length > 0);
+      parts.forEach((p, i) => {
+        const li = document.createElement('li');
+        li.className = 'py-2.5 flex items-center justify-between gap-2 ' + (p.on ? '' : 'opacity-50');
+        li.innerHTML = `
+          <div class="flex items-start gap-2 min-w-0">
+            <input type="checkbox" ${p.on ? 'checked' : ''} data-tg="${i}" class="mt-1 cursor-pointer" />
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-xs px-1.5 rounded border" style="border-color:var(--p-line); color:var(--p-muted)">${p.kind}</span>
+                <span class="text-sm font-semibold ${p.tip ? 'has-tip' : ''}" ${p.tip ? `data-tip="${p.tip}"` : ''}>${p.label}</span>
+              </div>
+              <div class="text-xs font-mono mt-0.5" style="color:var(--p-muted)">${p.formula}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-sm font-bold tabular-nums mr-1">${fmt(p.cost)}</span>
+            <button data-ed="${i}" class="gdr-btn-ghost px-2 py-0.5 rounded text-xs cursor-pointer" title="Modifica">✎</button>
+            <button data-rm="${i}" class="gdr-btn-ghost px-2 py-0.5 rounded text-xs cursor-pointer" title="Rimuovi">✕</button>
+          </div>`;
+        ul.appendChild(li);
+      });
+      ul.querySelectorAll('[data-tg]').forEach(cb => cb.addEventListener('change', () => { parts[+cb.dataset.tg].on = cb.checked; renderForge(); }));
+      ul.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { parts.splice(+b.dataset.rm, 1); renderForge(); }));
+      ul.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', () => {
+        editingIndex = +b.dataset.ed;
+        $('cancel-edit').classList.remove('hidden');
+        $('form-mode-title').textContent = `Modifica: ${parts[editingIndex].label}`;
+        setModTab(parts[editingIndex].m || 'spell');
+        updateSpellCalc();
+      }));
+    }
+    $('cancel-edit').addEventListener('click', () => { editingIndex = null; $('cancel-edit').classList.add('hidden'); $('form-mode-title').textContent = 'Configura Spell o Componente'; updateSpellCalc(); });
+    $('btn-clear').addEventListener('click', () => { parts = []; renderForge(); });
+    $('btn-reset-demo').addEventListener('click', () => location.reload());
+    $('btn-copy').addEventListener('click', () => {
+      const used = Math.max(0, +$('used-numen').value || 0);
+      const active = parts.filter(p => p.on);
+      const itemTot = active.reduce((s, p) => s + p.cost, 0);
+      navigator.clipboard?.writeText(
+        `${$('item-name').value} (${fmt(itemTot)} numen · Totale PG: ${fmt(used + itemTot)} numen)\n` +
+        active.map(p => `- ${p.label}: ${fmt(p.cost)} [${p.formula}]`).join('\n')
+      );
+      toast('Riepilogo copiato negli appunti!');
+    });
+
+    const grid = $('cp-grid');
+    COMPENDIUM.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'p-3.5 rounded border flex flex-col justify-between gap-2';
+      d.style.background = 'var(--p-input)'; d.style.borderColor = 'var(--p-line)';
+      d.innerHTML = `<div><div class="flex justify-between gap-2"><strong class="text-sm">${c.name}</strong><span class="font-bold text-sm" style="color:var(--p-wax)">${fmt(c.stated)} numen</span></div><p class="text-xs mt-1" style="color:var(--p-muted)">${c.note}</p></div><div class="flex justify-end pt-2 border-t" style="border-color:var(--p-line)"><button class="ld gdr-btn-primary px-3 py-1 rounded text-xs font-semibold gdr-serif-title cursor-pointer">Carica →</button></div>`;
+      d.querySelector('.ld').addEventListener('click', () => {
+        $('item-name').value = c.name.split('(')[0].trim();
+        parts = c.parts.map(p => ({ ...p }));
+        renderForge();
+        document.querySelector('[data-tab="forge"]').click();
+      });
+      grid.appendChild(d);
+    });
+
+    updateSpellCalc(); updateBonus(); updateFeat(); updateMat(); updateSpec(); renderForge();
+  </script>
+</body>
+</html>
