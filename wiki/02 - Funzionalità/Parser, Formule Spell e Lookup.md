@@ -36,8 +36,8 @@ Un paragrafo `<p>` diretto figlio di `<body>` viene promosso a `<h5 class="spell
 
 Questo consente di indicizzare ogni spell nel TOC, nella ricerca e nello Spellbook (`LookupService.spellBook()` filtra proprio `s.level === 5`).
 
-### Passaggio 2 — Wrapper tabelle responsive
-Ogni `<table>` figlia diretta di `<body>` viene avvolta in `<div class="tbl">...</div>` per consentire lo scorrimento orizzontale su smartphone.
+### Passaggio 2 — Wrapper tabelle responsive e immagini lazy
+Ogni `<table>` figlia diretta di `<body>` viene avvolta in `<div class="tbl">...</div>` per consentire lo scorrimento orizzontale su smartphone, e ogni `<img>` riceve `loading="lazy"` e `decoding="async"`.
 
 ### Passaggio 3 — Riconoscimento e markup delle formule delle spell
 Su ogni `<p>` e `<li>` con testo `<= 4000` caratteri viene testato `isFormula(text)`:
@@ -63,7 +63,7 @@ Itera sui figli diretti di `<body>` (ignorando `.expand-formula` e `.formula-det
 - **Altri blocchi**: accoda il testo a `cur.buf`; per le tabelle formatta le righe come `cella1 | cella2 | cella3` (`blockText()`), formato sfruttato poi da `explainSeed()` per trovare varianti in tabella!
 
 ### Altre utility di `doc-parser.ts`
-- **`sliceSection(html, anchor)`**: estrae un frammento HTML a partire dall'elemento `#anchor`:
+- **`sliceSectionFromDoc(dom, anchor)`** e **`sliceSection(html, anchor)`**: estraggono un frammento HTML a partire dall'elemento `#anchor` (la prima lavora su un `Document` già parsato tramite `cloneNode(true)` evitando un secondo `DOMParser`):
   - Se è una riga-formula (non `H1..H6`), restituisce solo quel paragrafo.
   - Se è un titolo `H1..H6`, accumula tutti gli elementi successivi fino al primo titolo di livello `<= level`.
   - Rimuove tutti gli attributi `id` (evita ID duplicati nel DOM del pannello) e rimuove `.expand-formula` e `.formula-detail`.
@@ -87,19 +87,20 @@ flowchart TD
 
 ### Dettagli dei metodi di `LookupService`
 - **`spellDocIds()`**: identifica i documenti degli incantesimi controllando se il nome del documento (o di una delle sue `parts`) matcha una delle regex in `environment.mergeGroups` (attualmente `/^Ch\.?\s*8a?\b/i`).
-- **`findEntries(term)`**: confronta `normTerm(s.heading) === exact || tokenKey(s.heading) === key` su tutte le sezioni in cache; ordina per `level` crescente.
+- **`findEntries(term)`**: esegue lookup **`O(1)`** tramite indice memoizzato su `library.version()` (`byNorm` e `byToken`, pre-ordinati per `level` crescente), includendo sia le sezioni della biblioteca sia le voci editoriali di `CUSTOM_ENTRIES` (`src/app/custom-entries.ts`, es. `Effect-Specific Spell [Metamagic]`).
+- **`parsedDoc(docId)` e `entryHtml(ref)`**: mantengono una **cache LRU di massimo 6 `Document` già parsati** (`domCache`, invalidata se cambia `modifiedTime:parser`) + deduplica concorrente (`domInflight`), e usano `sliceSectionFromDoc()` per estrarre le voci senza riparsare documenti enormi come `Ch 8 + 8a` (5,6 MB). Le voci con `docId === CUSTOM_DOC_ID` vengono servite direttamente da `customEntryHtml()`.
 - **`explainSeed(term, level)`**: antepone `<p class="seed-level">Livello N (come indicato nella formula)</p>`, poi applica la cascata: voce nei capitoli spell → riga di tabella varianti nei capitoli spell → fallback a `explain(term)`.
-- **`explain(term)`**: voce completa se esiste un titolo corrispondente (max 4), altrimenti fino a 6 snippet da ricerca esatta fra virgolette.
-- **`spellBook()`**: scandisce tutte le sezioni con `level === 5` cercando la riga che inizia con `Level ` (es. `Level arcane 1, divine 1`), parsifica le coppie `<lista> <cifra 0-9>` separate da virgola e costruisce `Map<lista, Map<livello, SpellRef[]>>`.
+- **`explain(term)`**: voce completa se esiste un titolo corrispondente (max 4, renderizzati in parallelo via `Promise.all`), altrimenti fino a 6 snippet da ricerca esatta fra virgolette.
+- **`spellBook()`**: memoizzato rispetto a `library.version()`, scandisce tutte le sezioni con `level === 5` cercando la riga che inizia con `Level ` (es. `Level arcane 1, divine 1`), parsifica le coppie `<lista> <cifra 0-9>` separate da virgola e costruisce `Map<lista, Map<livello, SpellRef[]>>`.
 
 ---
 
 ## 3. Auto-linking dei termini (`src/app/term-links.ts` e `DocComponent`)
 
-Quando un documento viene aperto in `DocComponent`, `linkNames()` trasforma automaticamente in link cliccabili (`.term-link`) i nomi di feat, talenti, spell e altre voci della biblioteca presenti nel corpo del testo (anche nelle schede del Bestiario).
+Quando un documento viene aperto in `DocComponent`, `linkNames()` trasforma automaticamente in link cliccabili (`.term-link`) i nomi di feat, talenti, spell e altre voci della biblioteca (incluse `CUSTOM_ENTRIES`) presenti nel corpo del testo (anche nelle schede del Bestiario).
 
 ### Costruzione della mappa (`namesOf` + `buildTermMap` + `LibraryService.linkTerms`)
-Per ogni sezione con `level >= 3` e titolo `5..80` caratteri (esclusi i 18 `GENERIC_HEADINGS`), `namesOf(heading)` genera:
+Per ogni sezione con `level >= 3` e titolo `5..80` caratteri (esclusi i 18 `GENERIC_HEADINGS`) e per le voci in `CUSTOM_ENTRIES`, `namesOf(heading)` genera:
 - **Nomi pieni (`full`, priorità alta)**:
   1. Titolo originale trimmato
   2. Senza `[tag]` e senza sigla fonte in coda (es. `Power Attack, Furious FocusAPG` → `Power Attack, Furious Focus`)
@@ -108,10 +109,12 @@ Per ogni sezione con `level >= 3` e titolo `5..80` caratteri (esclusi i 18 `GENE
 - **Nomi derivati (`derived`, priorità secondaria)**:
   - La parte prima della virgola (es. `"Overrun, Improved"` → `"Overrun"`).
 
-In `buildTermMap()`, **vince il primo inserito**: siccome `LibraryService.linkTerms()` ordina i documenti mettendo il Bestiario per ultimo e accoda `derived` dopo `full`, una regola/feat/spell reale vince sempre su una voce omonima del Bestiario e un nome pieno vince sempre su uno derivato.
+In `buildTermMap()`, **vince il primo inserito**: siccome `LibraryService.linkTerms()` ordina i documenti mettendo il Bestiario per ultimo e accoda `derived` dopo `full`, una regola/feat/spell reale vince sempre su una voce omonima del Bestiario e un nome pieno vince sempre su uno derivato. Inoltre `buildTermMap()` costruisce **`firstWordMax: Map<string, number>`** per saltare in `O(1)` le parole che non aprono alcun termine.
 
-### Matching greedy sul testo (`splitTerms`)
+### Matching greedy sul testo (`splitTerms`) e linking incrementale
 - Tokenizza i nodi di testo con `/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu` (parole intere: `"Power Attack"` non matcha `"Power Attacks"`).
-- Per ogni posizione token prova le finestre dalla più lunga (`min(maxWords, 10)`) fino a `1` (*longest-match first*: `"Power Attack Plus"` vince su `"Power Attack"`).
-- `DocComponent.linkNames()` usa `TreeWalker` su `NodeFilter.SHOW_TEXT`, saltando nodi dentro `h1..h6, a, button, .seed, .formula-detail` e nodi di testo con `<= 2` caratteri.
+- Per ogni token controlla `firstWordMax.get(toks[i].low)` e prova le finestre dalla più lunga (`min(maxForFirst, remaining)`) fino a `1` (*longest-match first*: `"Power Attack Plus"` vince su `"Power Attack"`).
+- `DocComponent.linkNames()` usa `TreeWalker` su `NodeFilter.SHOW_TEXT`, saltando nodi dentro `h1..h6, a, button, .seed, .term-link, .formula-detail` e nodi con `<= 2` caratteri:
+  - Sui documenti lunghi (`> 80` blocchi, come `Ch 8 + 8a`) usa **`IntersectionObserver`** (`rootMargin: '600px 0px'`) collegando solo i blocchi vicini alla viewport;
+  - Sui documenti più brevi elabora i blocchi a chunk con budget di **`10 ms` per frame** (`requestAnimationFrame`), cancellati automaticamente su cambio pagina o distruzione (`cancelLinkNames()`).
 - Gli span `.term-link` sono evidenziati in colore ceralacca (`--wax`), grassetto `600`, sottolineatura puntinata e `cursor: pointer` (`src/styles.css`).

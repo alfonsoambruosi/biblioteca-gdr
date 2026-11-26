@@ -28,14 +28,14 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Routin
 - **Login (`admin` / `0000`)**: validato interamente lato browser (`src/app/auth.service.ts`). Chiunque ispezioni il bundle JS può leggere credenziali, `driveRootId` e `apiKey`.
 - **Condivisione Drive pubblica**: la cartella Drive è accessibile in lettura a chiunque abbia il link o l'ID. La chiave API, pur iniettata via GitHub Secrets in build time, finisce comunque nel bundle pubblico servito al browser.
 - **Unica mitigazione effettiva attuale**: restrizione per **HTTP Referrer** e per **API** (solo Google Drive API) sulla console Google Cloud.
-- **Contenuti di terze parti**: i manuali contengono testi/regole potenzialmente coperti da copyright; se il repository è pubblico su GitHub, anche i 12 file `src/assets/snapshot-*.jsonl` (~151 MB) sono pubblicamente leggibili da chiunque sul repository.
+- **Contenuti di terze parti**: i manuali contengono testi/regole potenzialmente coperti da copyright; se il repository è pubblico su GitHub, anche i 10 file `src/assets/snapshot-*.jsonl` (~121,3 MB) sono pubblicamente leggibili da chiunque sul repository.
 
 > [!danger] Cronologia Git di `src/environments/environment.ts`
 > Dalla history Git (`git log`) risultano diversi commit passati che hanno modificato `src/environments/environment.ts` (es. *"Update API key in environment configuration"*). Anche se oggi il file contiene il segnaposto `INSERISCI_QUI_LA_TUA_API_KEY`, eventuali chiavi committate in passato restano visibili nella cronologia Git. **Azione consigliata**: verificare su Google Cloud Console che eventuali vecchie chiavi siano revocate o strettamente limitate per referrer e quota, oppure ripulire la history se necessario.
 
-### Sanitizzazione HTML (`bypassSecurityTrustHtml`)
-- `DocComponent` inserisce l'HTML dei documenti e dei pannelli con `DomSanitizer.bypassSecurityTrustHtml()` per preservare `id`, `data-*`, tabelle e bottoni.
-- È sicuro solo assumendo che chi ha accesso in scrittura alla cartella Google Drive (e agli snapshot nel repo) sia fidato.
+### Sanitizzazione HTML (`bypassSecurityTrustHtml`) e iframe Google Sheets (`SheetComponent`)
+- `DocComponent` inserisce l'HTML dei documenti e dei pannelli con `DomSanitizer.bypassSecurityTrustHtml()` per preservare `id`, `data-*`, tabelle e bottoni. È sicuro solo assumendo che chi ha accesso in scrittura alla cartella Google Drive (e agli snapshot nel repo) sia fidato.
+- `SheetComponent` usa `bypassSecurityTrustResourceUrl()` solo dopo aver verificato che l'ID esista nell'albero come `kind === 'gsheet'` e soddisfi `/^[A-Za-z0-9_-]+$/`, costruendo l'URL esclusivamente sul dominio `https://docs.google.com/spreadsheets/d/<id>/...`. Se il browser blocca i cookie di terze parti, resta disponibile il link esterno `Apri in Google Sheets ↗`.
 
 ### Per una protezione reale in futuro
 Come già indicato nel `README.md`, servirebbe passare a **Google OAuth 2.0** lato client (o un piccolo proxy backend) con cartella Drive condivisa solo con account Google autorizzati — e rimuovere gli snapshot da un repository pubblico.
@@ -45,7 +45,7 @@ Come già indicato nel `README.md`, servirebbe passare a **Google OAuth 2.0** la
 ## 2. Anomalie e piccoli bug residui nel codice
 
 ### Fix già applicati su `SteBranch`
-- **Asset degli snapshot in `angular.json`**: aggiunto `"assets": ["src/assets"]` in `architect.build.options` così i 12 file `snapshot-*.jsonl` vengono copiati in `dist/biblioteca-gdr/browser/assets/`.
+- **Asset degli snapshot in `angular.json`**: aggiunto `"assets": ["src/assets"]` in `architect.build.options` così i 10 file `snapshot-core-*.jsonl` e `snapshot-bestiary-*.jsonl` vengono copiati in `dist/biblioteca-gdr/browser/assets/`.
 - **Stile `.term-link` e `[hidden]` in `src/styles.css`**: corretto `.seed.term-link` in `.term-link` (con `color: var(--wax)`, `font-weight: 600`, sottolineatura puntinata e `cursor: pointer`) e rimosso il duplicato di `[hidden]`.
 - **`README.md` aggiornato**: allineato a tutte le funzionalità correnti (calcolatore oggetti magici, ricerca Bestiario, `term-links`, pannello ridimensionabile, snapshot).
 

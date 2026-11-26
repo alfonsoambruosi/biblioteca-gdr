@@ -23,7 +23,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Naviga
 
 ## Tema visivo ("Pergamena logora e invecchiata")
 
-Tutto lo styling globale dell'app è concentrato in un unico file `src/styles.css` (294 righe), senza framework CSS esterni né preprocessori. L'unico componente con stili incapsulati locali è `IconComponent`.
+Tutto lo styling globale dell'app è concentrato in un unico file `src/styles.css` (439 righe), senza framework CSS esterni né preprocessori. Gli unici componenti con stili incapsulati locali sono `IconComponent` e `SheetComponent`.
 
 ### Tipografia
 Importata da Google Fonts nella prima riga di `src/styles.css`:
@@ -53,7 +53,7 @@ Importata da Google Fonts nella prima riga di `src/styles.css`:
 | `--leather` | `#3a2816` | Fallback sfondo dietro la pergamena |
 | `--cream` | `#ecdcb4` | Testo chiaro su sfondo ceralacca |
 
-Effetto vignettatura: `body::before` applica un `radial-gradient` fisso scuro verso i bordi dello schermo (`pointer-events: none; z-index: 0`), mentre `app-root` resta a `z-index: 1`.
+Sfondo fisso e vignettatura: `body::before` (`position: fixed; inset: 0; will-change: transform; pointer-events: none; z-index: 0`) renderizza su un layer GPU dedicato **sia** lo sfondo pergamena (`--bg-image`) **sia** il `radial-gradient` scuro sui bordi (evitando i repaint pesanti di `background-attachment: fixed`), mentre `body` mantiene il colore solido `--leather` e `app-root` resta a `z-index: 1`.
 
 ---
 
@@ -61,7 +61,7 @@ Effetto vignettatura: `body::before` applica un `radial-gradient` fisso scuro ve
 
 | Breakpoint | Comportamento |
 |---|---|
-| Desktop (`>= 900px`) | `.page` larga max `980px` (`1240px` quando contiene `.doc-wrap` tramite `:has(.doc-wrap)`). Indice laterale `.side` sticky a sinistra (`width: 15.5rem` quando aperto). |
+| Desktop (`>= 900px`) | `.page` larga max `980px` (`1240px` con `:has(.doc-wrap)` sui documenti; `max-width: none` con `:has(.sheet-wrap)` per le schede Google Sheets a larghezza piena). Indice laterale `.side` sticky a sinistra (`width: 15.5rem` quando aperto). |
 | Tablet / schermi stretti (`<= 899px`) | `.toc-side` diventa un drawer fisso a sinistra (`width: min(18rem, 85vw)`, `z-index: 40`) e `.toc-toggle` resta fisso in alto a sinistra (`z-index: 41`). |
 | Smartphone (`<= 600px`) | `body` scende a `17px`, padding ridotto, barra ricerca e azioni su righe dedicate (`flex-basis: 100%`), griglia `.cards` a singola colonna (`1fr`). Input sempre a `16px` per evitare auto-zoom su iOS/Safari. |
 

@@ -28,8 +28,8 @@ Il progetto è un'applicazione client-side pura basata su **Angular 20** con bui
 | Pacchetto | Versione | Ruolo nel progetto |
 |---|---|---|
 | `@angular/core`, `common`, `compiler`, `forms`, `platform-browser`, `router` | `^20.0.0` | Framework SPA, standalone components, Signals, template control flow (`@if`, `@for`, `@switch`), router |
-| `idb-keyval` | `^6.2.1` | Wrapper minimalista chiave-valore su **IndexedDB** (`get`, `set`, `setMany`, `del`) usato da [[Flusso Dati e Cache\|LibraryService]] |
-| `mammoth` | `^1.8.0` | Conversione lato browser di file `.docx` (e Google Docs esportati in `.docx`) in HTML semantico (`mammoth/mammoth.browser`) |
+| `idb-keyval` | `^6.2.1` | Wrapper minimalista chiave-valore su **IndexedDB** (`get`, `getMany`, `set`, `setMany`, `del`) usato da [[Flusso Dati e Cache\|LibraryService]] |
+| `mammoth` | `^1.8.0` | Conversione lato browser di file `.docx` (e Google Docs esportati in `.docx`) in HTML semantico (`mammoth/mammoth.browser`, caricato via `import()` dinamico) |
 | `minisearch` | `^7.1.0` | Motore di ricerca full-text in memoria per sezioni con boosting, prefissi e combinazione `AND`/`OR` |
 | `rxjs` | `~7.8.0` | Usato quasi esclusivamente per adattare `ActivatedRoute` (`paramMap`, `queryParamMap`) a Signals tramite `toSignal` e `map` |
 | `zone.js` | `~0.15.0` | Change detection standard di Angular (configurato nei polyfill) |
@@ -65,11 +65,11 @@ Il progetto è un'applicazione client-side pura basata su **Angular 20** con bui
   - `index`: `src/index.html`
   - `browser`: `src/main.ts`
   - `polyfills`: `["zone.js"]`
-  - `assets`: `["src/assets"]` (copia `sfondi/` e `snapshot-1..12.jsonl` in `dist/biblioteca-gdr/browser/assets/`)
+  - `assets`: `["src/assets"]` (copia `sfondi/`, `snapshot-core-1..2.jsonl` e `snapshot-bestiary-1..8.jsonl` in `dist/biblioteca-gdr/browser/assets/`)
   - `styles`: `["src/styles.css"]`
 - **`allowedCommonJsDependencies`**: `["mammoth", "mammoth/mammoth.browser", "jszip", "lop", "bluebird", "underscore", "xmlbuilder", "sax", "argparse", "path-is-absolute", "dingbat-to-unicode"]` — elenco necessario per zittire i warning CommonJS generati da `mammoth` e dalle sue dipendenze transitive.
 - **Budget di produzione**:
-  - `initial`: warning `2MB`, error `5MB` (piuttosto ampio a causa di `mammoth` + `item-presets.ts` + `extra-lists.ts`).
+  - `initial`: warning `2MB`, error `5MB` (con il lazy loading delle rotte e di `mammoth` il bundle iniziale reale è sceso a ~`385 kB` raw / `107 kB` transfer).
   - `anyComponentStyle`: warning `8kB`, error `16kB`.
 - **`outputHashing`**: `"all"` in produzione; `optimization: false`, `sourceMap: true` in development.
 - **`cli.analytics`**: `false`.
@@ -81,7 +81,7 @@ Il progetto è un'applicazione client-side pura basata su **Angular 20** con bui
 - **Strictness**: `strict: true`, `noImplicitOverride: true`, `noImplicitReturns: true`, `isolatedModules: true`, `strictTemplates: true`, `strictInjectionParameters: true`, `strictInputAccessModifiers: true`.
 - **Eccezione intenzionale**: `noPropertyAccessFromIndexSignature: false` (consente l'accesso flessibile a record/risultati `MiniSearch`).
 - **Target/Module**: `target: "ES2022"`, `module: "preserve"`, `moduleResolution: "bundler"`, `lib: ["ES2022", "dom"]`.
-- **Ambient declaration (`src/typings.d.ts`)**: dichiara manualmente il modulo `mammoth/mammoth.browser` esponendo la firma tipizzata di `convertToHtml({ arrayBuffer }, { styleMap?, includeDefaultStyleMap? })`.
+- **Ambient declaration (`src/typings.d.ts`)**: dichiara manualmente il modulo `mammoth/mammoth.browser` esponendo `MammothImage`, `images.imgElement(...)` (usato da `image-compress.ts` per la compressione WebP) e `convertToHtml({ arrayBuffer }, { styleMap?, includeDefaultStyleMap?, convertImage? })`.
 
 ---
 

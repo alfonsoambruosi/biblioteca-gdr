@@ -26,7 +26,8 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Routing, Layout e Auth]], [[Parser
 
 La Home funge da cruscotto principale e presenta:
 1. **Card dinamiche delle cartelle di primo livello** (`categories`): filtra `library.tree().children` con `kind === 'folder'`, mostra l'icona scelta da `iconFor()` e il conteggio ricorsivo dei documenti leggibili (`lookup.countFiles(c)`).
-2. **Due card di strumenti fissi**:
+2. **Tre card di strumenti fissi**:
+   - **Bestiario** → `/bestiario` ([[Ricerca e Bestiario]])
    - **Incantesimi per classe** → `/incantesimi` ([[Incantesimi per Classe]])
    - **Creazione oggetti magici** → `/oggetti` ([[Calcolatore Oggetti Magici]])
 3. **Sezione collassabile `<details class="admin-box">`: *Copia per il caricamento rapido***:
@@ -40,7 +41,7 @@ La Home funge da cruscotto principale e presenta:
 
 Reagisce al parametro `:id` tramite `toSignal(route.paramMap)` e mostra:
 - **Breadcrumb (`.crumbs`)**: costruito con `library.pathOf(id)` (`Home › Manuale › ...`).
-- **Ricerca Bestiario contestuale**: se `library.isBestiary(id)` è `true` (cioè qualsiasi nodo nel percorso matcha `/bestiar|bestiary/i`), monta `<app-bestiary-search />` in cima alla cartella (vedi [[Ricerca e Bestiario]]).
+- **Bestiario contestuale**: se `library.isBestiary(id)` è `true` (cioè qualsiasi nodo nel percorso matcha `/bestiar|bestiary/i`), mostra il banner di accesso rapido a `/bestiario` (*Apri il Bestiario con filtri*) e monta `<app-bestiary-search />` in cima alla cartella (vedi [[Ricerca e Bestiario]]).
 - **Sottocartelle (`folders`)**: renderizzate come griglia `.cards` con conteggio documenti (`lookup.countFiles()`, che include anche i nodi `gsheet`).
 - **Documenti e schede (`files`)**: elenco `.list` dei nodi leggibili (`isDocNode`: `docx`, `gdoc`, `text` → `/doc/:id`) e dei Google Sheets (`isSheetNode`: `gsheet` → `/scheda/:id` con icona `people`). I file di tipo `'other'` (PDF, binari, ecc.) vengono omessi.
 
@@ -48,16 +49,16 @@ Reagisce al parametro `:id` tramite `toSignal(route.paramMap)` e mostra:
 
 ## 3. Lettore Documenti (`src/app/doc.component.ts`, rotta `/doc/:id`)
 
-È il componente interattivo più articolato per la consultazione dei manuali.
+È il componente interattivo più articolato per la consultazione dei manuali. Supporta anche il parametro query `?from=bestiario|incontro` per mostrare in cima il pulsante contestuale **← Torna al Bestiario** / **← Torna all’incontro generato** (mantenendo lo stato salvato in `BestiaryStateService`).
 
 ### Caricamento e ciclo di vita
 - Un `effect()` osserva `this.id()` e `this.library.tree()`: appena il nodo esiste nell'albero chiama `load(id)`.
-- `load(id)` recupera l'HTML da `library.getHtml(id)` (che legge da IndexedDB o sincronizza on-demand se mancante/stale).
-- **Protezione da race condition (`loadRun` / `panelRun`)**: ogni caricamento incrementa un contatore (`loadRun` per il documento, `panelRun` per il pannello inferiore, entrambi invalidati anche su cambio pagina, documento non trovato, chiusura pannello e `DestroyRef.onDestroy`). Se una richiesta lenta termina dopo un cambio documento o un nuovo clic, il risultato viene scartato senza sovrascrivere testo, stato di caricamento o scroll.
+- `load(id)` recupera l'HTML da `library.getHtml(id)` (che attende `loadCache()`, legge da IndexedDB o sincronizza on-demand se mancante/stale).
+- **Protezione da race condition (`loadRun` / `panelRun` / `linkRun`)**: ogni caricamento incrementa un contatore (`loadRun` per il documento, `panelRun` per il pannello inferiore, `linkRun` per l'auto-linking; tutti invalidati anche su cambio pagina, documento non trovato, chiusura pannello e `DestroyRef.onDestroy`). Se una richiesta lenta termina dopo un cambio documento o un nuovo clic, il risultato viene scartato senza sovrascrivere testo, stato di caricamento o scroll.
 - Inietta l'HTML tramite `DomSanitizer.bypassSecurityTrustHtml(optimized)` (aggiungendo `loading="lazy" decoding="async"` sulle `<img>` e preservando `id`, tabelle, `data-*` e pulsanti delle formule).
 - Nel `setTimeout` successivo al render Angular (verificando che `loadRun` e `linkRun` siano ancora attuali):
-  1. Esegue **`linkNames()`** (auto-linking di feat, talenti e spell nel testo tramite `TreeWalker` + `splitTerms`, vedi [[Parser, Formule Spell e Lookup#3. Auto-linking dei termini (term-links.ts e DocComponent)]]).
-  2. Esegue **`scrollToFragment()`** per portare l'utente esattamente all'ancora passata nel fragment URL (es. da un risultato di ricerca o dallo Spellbook).
+  1. Esegue **`linkNames()`** (auto-linking di feat, talenti e spell nel testo tramite `TreeWalker` + `splitTerms`, con `IntersectionObserver` `rootMargin: '600px 0px'` sui documenti con `> 80` blocchi e time-slicing a budget `10 ms/frame` via `requestAnimationFrame` sugli altri; vedi [[Parser, Formule Spell e Lookup#3. Auto-linking dei termini (term-links.ts e DocComponent)]]).
+  2. Esegue **`scrollToFragment()`** per portare l'utente esattamente all'ancora passata nel fragment URL (es. da un risultato di ricerca, dal Bestiario o dallo Spellbook).
 
 ### Indice laterale (TOC)
 - Costruito dal `computed` `toc`: prende tutte le sezioni in `library.meta(id).sections` con `heading` non vuoto e `level <= 5` (include `h1`–`h5` e voci di spell `h5.spell-entry`, escludendo le singole righe-formula `level === 6`).

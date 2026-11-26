@@ -27,12 +27,12 @@ updated: 2026-11-26
 |---|---|
 | **Framework** | Angular 20 (`@angular/build:application`, standalone, Signals, `zone.js`) |
 | **Linguaggio** | TypeScript ~5.8 (`strict: true`, target `ES2022`) |
-| **Origine dati** | Google Drive API v3 (cartella pubblica `driveRootId`) + 12 file `snapshot-*.jsonl` precompilati (~151,6 MB, 636 documenti) |
-| **Persistenza client** | IndexedDB tramite `idb-keyval` + `sessionStorage` (sessione) + `localStorage` (UI doc) |
-| **Parsing documenti** | `mammoth` (`.docx` e Google Docs esportati come `.docx`) + parser DOM custom (`doc-parser.ts`) |
-| **Motore di ricerca** | `MiniSearch` (in-memory, indicizzazione per sezione, separazione Regole vs Bestiario) |
+| **Origine dati** | Google Drive API v3 (cartella pubblica `driveRootId`) + 10 file snapshot precompilati (`snapshot-core-1..2.jsonl` + `snapshot-bestiary-1..8.jsonl`, ~121,33 MB, 636 documenti) |
+| **Persistenza client** | IndexedDB tramite `idb-keyval` (cache documenti + indice `MiniSearch`) + `localStorage` (sessione multi-tab + UI doc) |
+| **Parsing documenti** | `mammoth` (import dinamico + compressione WebP per `.docx` e Google Docs) + parser DOM custom (`doc-parser.ts`) |
+| **Motore di ricerca** | `MiniSearch` (persistito in IndexedDB, indicizzazione per sezione, separazione Regole vs Bestiario) |
 | **Hosting** | Statico (GitHub Pages con GitHub Actions o Netlify Drop) con `withHashLocation()` |
-| **Dataset inclusi nel repo** | 182 preset di oggetti (`ITEM_PRESETS`), 37 oggetti composti (`COMPOSITE_ITEMS`), 332 trucchi/spell del Ladro (`ROGUE_TRICKS`), 25 manovre Mano d'Ombra (`SHADOW_HAND`), 5 sfondi pergamena |
+| **Dataset inclusi nel repo** | 182 preset di oggetti (`ITEM_PRESETS`), 37 oggetti composti (`COMPOSITE_ITEMS`), 332 trucchi/spell del Ladro (`ROGUE_TRICKS`), 25 manovre Mano d'Ombra (`SHADOW_HAND`), voce editoriale `Effect-Specific Spell` (`custom-entries.ts`), 5 sfondi pergamena |
 
 ---
 
@@ -46,7 +46,7 @@ updated: 2026-11-26
 
 ### 02 — Funzionalità
 - [[Navigazione e Lettura Documenti]] — Home, esplorazione cartelle (`FolderComponent`), visualizzatore documenti (`DocComponent`), schede personaggio Google Sheets (`SheetComponent`), indice laterale (TOC) e pannello inferiore ridimensionabile.
-- [[Ricerca e Bestiario]] — Motore di ricerca full-text (`SearchComponent`), ranking a 3 livelli, separazione del Bestiario e ricerca dedicata (`BestiarySearchComponent`).
+- [[Ricerca e Bestiario]] — Motore di ricerca full-text (`SearchComponent`), ranking a 3 livelli, separazione del Bestiario, catalogo filtrabile per singola creatura (`/bestiario`), generatore di incontri casuali (`encounter-gen.ts`), stato persistente (`BestiaryStateService`) e ricerca contestuale (`BestiarySearchComponent`).
 - [[Parser, Formule Spell e Lookup]] — Arricchimento HTML (`doc-parser.ts`), riconoscimento formule/semi, risoluzione descrizioni (`LookupService`) e auto-linking dei termini (`term-links.ts`).
 - [[Incantesimi per Classe]] — Costruzione dinamica delle liste (`SpellbookComponent`), liste statiche (`extra-lists.ts`), Mago + Mano d'Ombra, Ladro e ricerca online di fallback.
 - [[Calcolatore Oggetti Magici]] — Formula *numen* e *gp* (`item-calc.ts`), scorta privata (`×18`), 182 preset (`item-presets.ts`), 37 oggetti composti (`item-composite.ts`) e interfaccia (`ItemCalcComponent`).
@@ -70,21 +70,21 @@ updated: 2026-11-26
 flowchart TB
     subgraph External["Origini Dati"]
         GD["Google Drive API v3\n(cartella pubblica)"]
-        SNAP["assets/snapshot-1..12.jsonl\n(copia precompilata)"]
+        SNAP["assets/snapshot-core-1..2.jsonl\n+ snapshot-bestiary-1..8.jsonl"]
     end
 
     subgraph Services["Servizi Angular (root)"]
         DS["DriveService\n(fetch + pool max 2 + retry)"]
         LS["LibraryService\n(sync, cache, MiniSearch, termMap)"]
-        LKS["LookupService\n(voci, semi, spellBook)"]
-        AS["AuthService\n(sessionStorage)"]
+        LKS["LookupService\n(voci O(1), DOM LRU, semi, spellBook)"]
+        BS["BestiaryStateService\n(stato filtri e incontri)"]
+        AS["AuthService\n(localStorage multi-tab)"]
         DEV["DeviceService\n(PC / Tablet / Smartphone)"]
     end
 
     subgraph Storage["Browser Storage"]
-        IDB[("IndexedDB\n(idb-keyval)")]
-        SS[("sessionStorage\nbgdr-session")]
-        LOC[("localStorage\nbgdr-toc / bgdr-panel-h")]
+        IDB[("IndexedDB\n(idb-keyval: tree, meta, html, searchIndex)")]
+        LOC[("localStorage\nbgdr-session / bgdr-toc / bgdr-panel-h")]
     end
 
     subgraph UI["Pagine e Componenti"]
@@ -95,6 +95,7 @@ flowchart TB
         DOC["DocComponent\n(/doc/:id)"]
         SHEET["SheetComponent\n(/scheda/:id)"]
         SEARCH["SearchComponent\n(/cerca)"]
+        BEST["BestiaryComponent\n(/bestiario)"]
         SPELL["SpellbookComponent\n(/incantesimi)"]
         CALC["ItemCalcComponent\n(/oggetti)"]
     end
@@ -103,15 +104,16 @@ flowchart TB
     SNAP --> LS
     LS <--> IDB
     LS --> LKS
-    AS <--> SS
+    AS <--> LOC
 
     LOGIN --> AS
     LOGIN --> LS
-    SHELL --> HOME & FOLDER & DOC & SHEET & SEARCH & SPELL & CALC
+    SHELL --> HOME & FOLDER & DOC & SHEET & SEARCH & BEST & SPELL & CALC
     DOC --> LS & LKS
     DOC <--> LOC
     SHEET --> LS
     SEARCH --> LS
+    BEST --> LS & LKS & BS
     FOLDER --> LS & LKS
     SPELL --> LS & LKS
     CALC --> LS & LKS
@@ -122,9 +124,9 @@ flowchart TB
 
 ## Contenuto indicizzato nello snapshot attuale
 
-Dall'intestazione di `src/assets/snapshot-1.jsonl` (`generatedAt: 2026-11-21T14:48:46.511Z`):
+Dall'intestazione di `src/assets/snapshot-core-1.jsonl` (`generatedAt: 2026-11-21T14:48:46.511Z`):
 
-- **Radice**: `Biblioteca` (732 elementi non-cartella totali; **636 documenti** salvati nei 12 file JSONL per ~151,6 MB complessivi).
+- **Radice**: `Biblioteca` (732 elementi non-cartella totali; **636 documenti** salvati nei 10 file JSONL per **~121,33 MB** complessivi: 2 file Core da ~15,20 MB + 8 file Bestiario da ~106,13 MB).
   - `Manuale` (699 doc):
     - `Bestiary` (666 doc — suddiviso per tipo/ambiente)
     - `Classes` (22 doc)

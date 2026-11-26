@@ -23,7 +23,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Incantesimi per Classe]], [[Parser
 
 ## Panoramica (`rotta /oggetti`)
 
-È la funzionalità più recente del progetto (introdotta negli ultimi 4 commit, non ancora documentata in `README.md`) ed è distribuita su **4 file**:
+Calcolatore interattivo per la creazione di oggetti magici, alchimia/veleni e oggetti composti, distribuito su **4 file**:
 - `src/app/item-calc.ts` — Motore di calcolo puro
 - `src/app/item-presets.ts` — **182 preset** estratti da *Ch 6a - Item Compendium*
 - `src/app/item-composite.ts` — **37 oggetti composti** multi-parte o con eccezioni rispetto alla formula
@@ -76,7 +76,7 @@ Ogni preset include anche `excluded: string[]`: quando viene caricato (`loadPres
 Contiene **37 `CompositeItem`** che o combinano più parti (es. *Null Blade*, *Holy Avenger*, *Luck Blade*, *Frost Brand*, *Staff of Withering*) oppure presentano nel libro un totale stampato (`stated`) che diverge dalla formula o ha livelli frazionari/livello 0 (es. *Belt of Dwarvenkind*, *Rope of Entanglement*, *Potion of Longevity*, *Belladonna*, *Grinding*).
 
 Ogni parte (`CompositePart`) è una union discriminata:
-- `{ kind: 'formula', label, level, cl, price, mult }` → valore `level * cl * price * mult`
+- `{ kind: 'formula', label, level, cl, price, mult }` → valore `(level === 0 ? 0.5 : level) * cl * price * mult`
 - `{ kind: 'fixed', label, total }` → valore fisso stampato dal libro
 
 > [!info] Fedeltà al manuale
@@ -86,7 +86,7 @@ Ogni parte (`CompositePart`) è una union discriminata:
 
 ## 3. Struttura dell'interfaccia (`src/app/item-calc.component.ts`)
 
-La pagina è organizzata in 5 blocchi sequenziali (`.calc-block`):
+La pagina è organizzata in 5 blocchi sequenziali (`.calc-block`) con debounce di `120 ms` sui 3 campi di ricerca:
 
 1. **Sezione 0 — Oggetto del Compendio (facoltativo)**:
    - Filtro per categoria + ricerca testuale sui 182 `ITEM_PRESETS` (max 500 opzioni).
@@ -95,7 +95,7 @@ La pagina è organizzata in 5 blocchi sequenziali (`.calc-block`):
    - Popolata dinamicamente da `lookup.spellBook().get('arcane')` prendendo il livello minimo di ciascuna spell, ordinata alfabeticamente (`localeCompare('it')`), filtrabile (max 400 opzioni).
 3. **Sezione 2 — Variazioni**:
    - 4 tipologie selezionabili da menu a tendina (`KINDS`):
-     - `metamagia`: sezioni con `level >= 3` dai documenti il cui nome matcha `/Ch 8/i` e il cui titolo contiene `[...Metamagic...]` + componenti dei preset con `\bSpell\b|Evocation` assenti dalla biblioteca.
+     - `metamagia`: sezioni con `level >= 3` dai documenti il cui nome matcha `/Ch 8/i` e il cui titolo contiene `[...Metamagic...]` + voci editoriali `CUSTOM_ENTRIES` (`Effect-Specific Spell`, `-2 livelli`) + componenti dei preset con `\bSpell\b|Evocation` assenti dalla biblioteca.
      - `talento`: sezioni con `level >= 3` dai documenti il cui nome matcha `/Feat/i`.
      - `abilita`: sezioni con `level >= 3` dai documenti il cui nome matcha `/Skill/i`.
      - `proprieta`: componenti dei preset non classificati come metamagia e assenti dalla biblioteca (es. `ghost touch`, `Crippling Drain`, `Fell Frightening`).

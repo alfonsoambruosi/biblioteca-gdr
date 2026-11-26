@@ -30,7 +30,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Flusso Dati e Cache]], [[Mappa Com
 | `Section` | `id` (es. `s-12`, `p0-4`, `s-f3`), `heading`, `level` (`1..6`), `text` | Unità atomica di indicizzazione (MiniSearch), TOC (`level <= 5`), Spellbook (`level === 5`), formule (`level === 6`) |
 | `DocMeta` | `id`, `name`, `modifiedTime`, `size`, `parser?: number`, `sections: Section[]` | Metadati persistenti in IndexedDB (`meta:<id>`) e negli snapshot |
 | `SearchHit` | `docId`, `docName`, `path`, `anchor`, `heading`, `snippet` (HTML escapato con `<mark>`) | Risultati di `LibraryService.search()` |
-| `Snapshot` | `generatedAt`, `tree`, `docs: Record<string, { meta, html }>` | Tipo legacy/documentativo (il formato runtime attuale è NDJSON streaming per riga in `snapshot-N.jsonl`) |
+| `Snapshot` | `generatedAt`, `tree`, `docs: Record<string, { meta, html }>` | Tipo legacy/documentativo (il formato runtime attuale è NDJSON streaming per riga in `snapshot-core-N.jsonl` e `snapshot-bestiary-N.jsonl`) |
 
 ---
 
@@ -43,8 +43,12 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Flusso Dati e Cache]], [[Mappa Com
 | `lookup.service.ts` | `EntryRef` | `{ docId, docName, anchor, heading, level }` (`1..5` voce vera, `6` riga-formula) |
 | `lookup.service.ts` | `SpellRef` | `{ name, docName, docId?, anchor?, url? }` (interno se `docId` presente, altrimenti ricerca online `url`) |
 | `term-links.ts` | `TermTarget` | `{ docId, docName, anchor, heading, level }` |
-| `term-links.ts` | `TermMap` | `{ map: Map<string, TermTarget>; maxWords: number }` |
+| `term-links.ts` | `TermMap` | `{ map: Map<string, TermTarget>; maxWords: number; firstWordMax: Map<string, number> }` |
 | `term-links.ts` | `TextPart` | `{ text: string; ref?: TermTarget }` |
+| `custom-entries.ts` | `CustomEntry` | `{ id, heading, level, kind: 'metamagia', adj: number \| null, text, html }` — voce editoriale del sito |
+| `bestiary-index.ts` | `BestiaryEntry`, `EnvGroup` | Singola creatura indicizzata (`id`, `docId`, `docName`, `anchor`, `name`, `letter`, `category`, `subcategory`, `crs`, `crMin`, `crMax`, `crLabel`, `sizes`, `envs`, `searchBlob`) e gruppo ambientale (`key`, `label`, `re`) |
+| `bestiary-state.service.ts` | `BestiaryViewMode`, `BestiarySortMode` | `'catalog' \| 'encounter' \| 'folders'` e `'name-asc' \| 'name-desc' \| 'cr-asc' \| 'cr-desc'` |
+| `encounter-gen.ts` | `EncounterStyle`, `DifficultyOption`, `EncounterSlot`, `GeneratedEncounter` | Composizione (`'random' \| 'solo' \| 'group' \| 'horde' \| 'boss-minions'`), difficoltà DOOM (`id`, `label`, `offset`), slot (`entry`, `cr`, `crLabel`, `xpEach`, `count`) e risultato incontro (`slots`, `styleUsed`, `budgetXp`, `totalXp`) |
 | `extra-lists.ts` | `ListItem` | `{ level: number; group: string; name: string }` |
 | `device.ts` | `DeviceKind` | `'smartphone' \| 'tablet' \| 'pc'` |
 | `icon.component.ts` | `IconKey` | `'dragon' \| 'shield' \| 'scroll' \| 'spell' \| 'gem' \| 'lantern' \| 'people' \| 'book' \| 'folder'` |
@@ -63,8 +67,11 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Flusso Dati e Cache]], [[Mappa Com
 | **IndexedDB** (`idb-keyval`, store default `keyval`) | `tree` | `TreeNode` radice dell'intera biblioteca | `LibraryService` |
 | **IndexedDB** | `meta:<docId>` | `DocMeta` (sezioni, versione parser, `modifiedTime`) | `LibraryService` |
 | **IndexedDB** | `html:<docId>` | Stringa HTML arricchita da `enrichHtml()` / `plainParse()` | `LibraryService` |
+| **IndexedDB** | `searchIndex` | `{ v, sig, data }` — indice `MiniSearch` serializzato con firma di validazione | `LibraryService` |
 | **IndexedDB** | `lastCheck` | Stringa ISO data ultima verifica Drive completata | `LibraryService` |
-| **IndexedDB** | `snapshotAt` | Stringa ISO `generatedAt` dell'ultimo snapshot importato | `LibraryService` |
-| **`sessionStorage`** | `bgdr-session` | `'ok'` quando autenticato nella scheda corrente | `AuthService` |
+| **IndexedDB** | `snapshotCoreAt` | Stringa ISO `generatedAt` dell'ultimo snapshot Core importato | `LibraryService` |
+| **IndexedDB** | `snapshotBestiaryAt` | Stringa ISO `generatedAt` dell'ultimo snapshot Bestiario importato | `LibraryService` |
+| **IndexedDB** | `snapshotAt` | Stringa ISO `generatedAt` del formato snapshot legacy (fallback) | `LibraryService` |
+| **`localStorage`** | `bgdr-session` | `'ok'` quando autenticato (condiviso tra tutte le schede, con migrazione automatica da `sessionStorage`) | `AuthService` |
 | **`localStorage`** | `bgdr-toc` | `'1'` (indice aperto) o `'0'` (indice chiuso) | `DocComponent` |
 | **`localStorage`** | `bgdr-panel-h` | Altezza in pixel (stringa numerica) del pannello inferiore | `DocComponent` |

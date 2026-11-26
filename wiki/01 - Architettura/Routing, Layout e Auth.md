@@ -32,6 +32,8 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Naviga
 
 ## Tabella delle rotte (`src/app/app.routes.ts`)
 
+Tutte le rotte secondarie utilizzano **`loadComponent`** (lazy loading) e impostano un `title` dedicato; solo `ShellComponent` e `HomeComponent` restano nel bundle iniziale.
+
 ```mermaid
 flowchart LR
     ROOT["/ (ShellComponent)\n[authGuard]"]
@@ -42,6 +44,7 @@ flowchart LR
     ROOT --> D["doc/:id -> DocComponent"]
     ROOT --> S["scheda/:id -> SheetComponent"]
     ROOT --> C["cerca?q=... -> SearchComponent"]
+    ROOT --> B["bestiario -> BestiaryComponent"]
     ROOT --> I["incantesimi -> SpellbookComponent"]
     ROOT --> O["oggetti -> ItemCalcComponent"]
     WILDCARD["**"] -.redirect.-> ROOT
@@ -49,17 +52,18 @@ flowchart LR
     ACC -.già loggato.-> ROOT
 ```
 
-| Percorso (dopo `#/`) | Componente | Guardia | Query / Fragment | Descrizione |
-|---|---|---|---|---|
-| `/accesso` | `LoginComponent` | `guestGuard` | `?returnUrl=...` | Form di login (`admin` / `0000`) |
-| `/` | `ShellComponent` → `HomeComponent` | `authGuard` | — | Dashboard con categorie, strumenti ed export snapshot |
-| `/cartella/:id` | `ShellComponent` → `FolderComponent` | `authGuard` | — | Contenuto di una cartella (sottocartelle + file + ricerca bestiario se dentro Bestiary) |
-| `/doc/:id` | `ShellComponent` → `DocComponent` | `authGuard` | `#s-N`, `#p0-N`, `#s-fN` | Lettore documenti con TOC, formule interattive e pannello descrizioni |
-| `/scheda/:id` | `ShellComponent` → `SheetComponent` | `authGuard` | — | Scheda personaggio Google Sheets incorporata (`Solo lettura`, `Modifica`, checkbox `Mostra menu`) |
-| `/cerca` | `ShellComponent` → `SearchComponent` | `authGuard` | `?q=...` | Ricerca full-text globale (esclude Bestiario) |
-| `/incantesimi` | `ShellComponent` → `SpellbookComponent` | `authGuard` | — | Liste incantesimi per classe e livello |
-| `/oggetti` | `ShellComponent` → `ItemCalcComponent` | `authGuard` | — | Calcolatore oggetti magici, alchimia e composti |
-| `**` | redirect a `''` | — | — | Fallback verso Home (protetta da `authGuard`) |
+| Percorso (dopo `#/`) | Componente | Caricamento | Guardia | Query / Fragment | Descrizione |
+|---|---|---|---|---|---|
+| `/accesso` | `LoginComponent` | Lazy | `guestGuard` | `?returnUrl=...` | Form di login (`admin` / `0000`) |
+| `/` | `ShellComponent` → `HomeComponent` | Eager | `authGuard` | — | Dashboard con categorie, strumenti ed export snapshot |
+| `/cartella/:id` | `ShellComponent` → `FolderComponent` | Lazy | `authGuard` | — | Contenuto di una cartella (sottocartelle + file + ricerca bestiario se dentro Bestiary) |
+| `/doc/:id` | `ShellComponent` → `DocComponent` | Lazy | `authGuard` | `#s-N`, `#p0-N`, `#s-fN`, `?from=bestiario\|incontro` | Lettore documenti con TOC, formule interattive e pannello descrizioni |
+| `/scheda/:id` | `ShellComponent` → `SheetComponent` | Lazy | `authGuard` | — | Scheda personaggio Google Sheets incorporata (`Solo lettura`, `Modifica`, checkbox `Mostra menu`) |
+| `/cerca` | `ShellComponent` → `SearchComponent` | Lazy | `authGuard` | `?q=...` | Ricerca full-text globale (esclude Bestiario) |
+| `/bestiario` | `ShellComponent` → `BestiaryComponent` | Lazy | `authGuard` | — | Bestiario filtrabile per creatura (~2.080 voci), generatore di incontri casuali e vista cartelle |
+| `/incantesimi` | `ShellComponent` → `SpellbookComponent` | Lazy | `authGuard` | — | Liste incantesimi per classe e livello |
+| `/oggetti` | `ShellComponent` → `ItemCalcComponent` | Lazy | `authGuard` | — | Calcolatore oggetti magici, alchimia e composti |
+| `**` | redirect a `''` | — | — | — | Fallback verso Home (protetta da `authGuard`) |
 
 ---
 
@@ -67,7 +71,8 @@ flowchart LR
 
 ### `AuthService`
 - Credenziali hardcoded: `LOGIN_USER = 'admin'`, `LOGIN_PASS = '0000'` (`user.trim() === LOGIN_USER && pass === LOGIN_PASS`).
-- Persistenza: `sessionStorage` con chiave `'bgdr-session'` = `'ok'` (dura per la singola scheda/sessione browser; racchiuso in `try/catch` in caso di storage bloccato).
+- Persistenza: **`localStorage`** con chiave `'bgdr-session'` = `'ok'` (condivisa tra tutte le schede dello stesso browser; migra automaticamente eventuali sessioni preesistenti in `sessionStorage`, racchiuso in `try/catch` in caso di storage bloccato).
+- Sincronizzazione multi-tab: ascolta l'evento `window.addEventListener('storage', ...)` su `'bgdr-session'` per aggiornare `loggedIn` in tempo reale tra schede aperte.
 - Stato reattivo: `readonly loggedIn = signal(readSession())`.
 
 > [!danger] Barriera di comodo, non sicurezza reale
@@ -97,7 +102,7 @@ Struttura del template:
    - Form di ricerca globale (`role="search"`) → naviga a `/cerca?q=...` e fa `window.scrollTo({ top: 0 })`
    - Pulsante **Esci** (`logout()`)
 2. **Barra di stato sincronizzazione (`.sync`)**:
-   - Mostra `syncText()` (calcolato via `computed` da `status`, `fatalError`, `done`/`total`, `docErrors`, `lastCheck` in formato `HH:mm` `it-IT`). Assume la classe `.warn` in caso di errore.
+   - Mostra `syncText()` (calcolato via `computed` da `status`, `fatalError`, `done`/`total`, `bestiaryStatus`, `docErrors`, `lastCheck` in formato `HH:mm` `it-IT`). Assume la classe `.warn` in caso di errore.
    - Mostra a destra `Dispositivo: {{ device.label() }}`.
 3. **Contenuto (`<main class="page">`)**: `<router-outlet />`.
 

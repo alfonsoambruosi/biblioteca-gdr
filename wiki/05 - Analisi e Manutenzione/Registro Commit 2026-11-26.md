@@ -52,19 +52,24 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 23 | `c575723` | Feature | Generatore di incontri casuali nel Bestiario con difficoltà DOOM (`−1..+5`, *I'm just a baby boy* → *Dante Must Die*) | Pushato |
 | 24 | `c11340c` | UX | Persistenza stato Bestiario/Incontro (`BestiaryStateService`), sync `<select>` e pulsante *← Torna* in `DocComponent` | Pushato |
 | 25 | `fa0be28` | UX | Sessione in `localStorage` tra schede + fix race condition `loadCache()`/`getHtml()` all'apertura diretta di `/doc/:id` | Pushato |
-| 26 | `c47a005` | Feature | Espansione per singola creatura (`~2.075` voci) + regex CR a fine riga + link diretti `#s-N` + ricerca per nome | Pushato |
-| 27 | `5694864` | Fix | Prevenzione race condition su caricamento documenti, pannello lookup ed espansione formule | Locale |
-| 28 | `be71908` | CI | Aggiunto `package-lock.json`, passaggio a `npm ci` e validazione `DRIVE_API_KEY` in GitHub Actions | Locale |
-| 29 | `746cbb1` | Feature | Schede personaggio Google Sheets incorporate (`/scheda/:id`), default *Solo lettura*, *Modifica* e checkbox *Mostra menu* | Locale |
-| 30 | `74218b3` | Fix | Calcolatore oggetti magici (`/oggetti`): livello finale `0` (trucchetti) valutato `0,5` nel calcolo del costo | Locale |
+| 26 | `c47a005` | Feature | Espansione per singola creatura (`~2.080` voci) + regex CR a fine riga + link diretti `#s-N` + ricerca per nome | Pushato |
+| 27 | `46e82b3` | Docs | Aggiornato registro commit con Bestiario, generatore incontri e auth multi-tab | Pushato |
+| 28 | `5694864` | Fix | Prevenzione race condition su caricamento documenti, pannello lookup ed espansione formule | Locale |
+| 29 | `be71908` | CI | Aggiunto `package-lock.json`, passaggio a `npm ci` e validazione `DRIVE_API_KEY` in GitHub Actions | Locale |
+| 30 | `746cbb1` | Feature | Schede personaggio Google Sheets incorporate (`/scheda/:id`), default *Solo lettura*, *Modifica* e checkbox *Mostra menu* | Locale |
+| 31 | `59ea1a3` | Docs | Aggiornata wiki per schede Google Sheets incorporate e registro commit | Locale |
+| 32 | `74218b3` | Fix | Calcolatore oggetti magici (`/oggetti`): livello finale `0` (trucchetti) valutato `0,5` nel calcolo del costo | Locale |
+| 33 | `3be8d9a` | Docs | Aggiornata wiki per pricing `0,5` dei trucchetti di livello 0 e registro commit | Locale |
+| 34 | `3f156f6` | Docs | Riallineate pagine wiki tecniche con CI workflow, `package-lock.json` e guardie race condition di `DocComponent` | Locale |
+| 35 | `d52912c` | Refactor | Rimossa logica `availableLetters` / `[disabled]` dalla barra alfabetica A–Z del Bestiario (tutte le 27 lettere sono presenti) | Locale |
 
-### Risultato misurato complessivo (Tier 1 + Tier 2 + Tier 3)
+### Risultato misurato complessivo (inclusi Bestiario e Schede)
 
-| Metrica | Prima (`3350707`) | Dopo tutti gli interventi | Miglioramento |
+| Metrica | Prima (`3350707`) | Dopo tutti gli interventi (`d52912c`) | Miglioramento |
 |---|---:|---:|---:|
-| **Bundle iniziale (raw)** | `788.10 kB` | `375.34 kB` | **-52,4%** |
-| **Bundle iniziale (transfer)** | `199.33 kB` | `105.28 kB` | **-47,2%** |
-| **Tempo di build** | `4.36 s` | `2.15 s` | **-50,7%** |
+| **Bundle iniziale (raw)** | `788.10 kB` | `384.66 kB` | **-51,2%** |
+| **Bundle iniziale (transfer)** | `199.33 kB` | `107.41 kB` | **-46,1%** |
+| **Tempo di build** | `4.36 s` | `2.42 s` | **-44,5%** |
 | **Peso totale snapshot** | `158.96 MB` (12 file) | `121.33 MB` (10 file) | **-23,7% (-37,6 MB)** |
 | **Snapshot attesi al primo login** | `158.96 MB` (tutti) | `15.20 MB` (solo Core; Bestiario in background) | **-90,4%** |
 | **Snapshot nel `dist/`** | Assenti (bug `angular.json`) | Copiati in `dist/.../assets/` | **Risolto** |
@@ -284,6 +289,20 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 
 ---
 
+### 20. `a2c2bda` — Aggiornamento registro commit (fix QA e `Effect-Specific Spell`)
+- **Messaggio:** `Docs: update daily commit log with QA fixes and Effect-Specific Spell`
+- **File modificati:** `wiki/05 - Analisi e Manutenzione/Registro Commit 2026-11-26.md`
+- **Modifica:** Documentati nel diario giornaliero i commit `63faf28`, `1805187` e `cf8e3ec`.
+
+---
+
+### 21. `ee262bc` — Note evolutive su `custom-entries` e `Ch 8+8a`
+- **Messaggio:** `Docs: note future refactoring for custom-entries and Ch 8+8a rendering in wiki`
+- **File modificati:** `wiki/05 - Analisi e Manutenzione/Sicurezza, Limiti e Debito Tecnico.md`
+- **Modifica:** Aggiunti nella checklist di evoluzione futura il mini-refactoring di `custom-entries.ts` e il rendering/paginazione on-demand per capitoli molto lunghi come `Ch 8 + 8a`.
+
+---
+
 ### 22. `af65b85` — Nuovo Bestiario filtrabile (`/bestiario`) con barra CR a doppio cursore
 - **Messaggio:** `Feature: add filterable Bestiary explorer (/bestiario) with CR range slider, ordered filters, A-Z, and folder view`
 - **File modificati:** `src/app/bestiary-index.ts`, `src/app/bestiary.component.ts`, `src/app/app.routes.ts`, `src/app/home.component.ts`, `src/app/folder.component.ts`, `src/styles.css` (`+755`)
@@ -315,25 +334,32 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 ### 26. `c47a005` — Espansione per singola creatura, regex CR a fine riga e ricerca per nome
 - **Messaggio:** `Feature: expand Bestiary per creature with EOL CR regex, direct anchors, and name-first search`
 - **File modificati:** `src/app/bestiary-index.ts`, `src/app/bestiary.component.ts`, `src/app/encounter-gen.ts` (`+189 / -84`)
-- **Modifica:** Raffinata la regex CR a fine riga (`/(?:^|\s)CR\s*(\d+(?:\/\d+)?|[½¼⅓⅛])\s*$/gim`), espanse le 629 schede in ~2.075 singole creature con link diretto `#s-N` (e sottotitolo `in <Documento>`), deduplicazione per `docId#anchor` nel Generatore, e ricerca del Catalogo ristretta a nome creatura (in cima) seguita dalle creature in pagine con quel nome.
+- **Modifica:** Raffinata la regex CR a fine riga (`/(?:^|\s)CR\s*(\d+(?:\/\d+)?|[½¼⅓⅛])\s*$/gim`), espanse le 629 schede in ~2.080 singole creature con link diretto `#s-N` (e sottotitolo `in <Documento>`), deduplicazione per `docId#anchor` nel Generatore, e ricerca del Catalogo ristretta a nome creatura (in cima) seguita dalle creature in pagine con quel nome.
 
 ---
 
-### 27. `5694864` — Prevenzione race condition in `DocComponent`
+### 27. `46e82b3` — Aggiornamento registro commit (Bestiario, generatore incontri, auth multi-tab)
+- **Messaggio:** `Docs: update daily commit log with Bestiary explorer, encounter generator, and multi-tab auth`
+- **File modificati:** `wiki/05 - Analisi e Manutenzione/Registro Commit 2026-11-26.md`
+- **Modifica:** Documentati nel diario i commit `af65b85`–`c47a005`.
+
+---
+
+### 28. `5694864` — Prevenzione race condition in `DocComponent`
 - **Messaggio:** `Fix: prevent race conditions when loading docs, lookup panel, and formulas`
 - **File modificati:** `src/app/doc.component.ts` (`+65 / -23`)
-- **Modifica:** Protetto il caricamento asincrono di documenti, pannello lookup ed espansione formule contro risposte arrivate fuori ordine in seguito a navigazioni o clic rapidi.
+- **Modifica:** Protetto il caricamento asincrono di documenti, pannello lookup ed espansione formule contro risposte arrivate fuori ordine in seguito a navigazioni o clic rapidi (`loadRun`, `panelRun`, `linkRun`).
 
 ---
 
-### 28. `be71908` — `package-lock.json`, `npm ci` e validazione `DRIVE_API_KEY` in CI
+### 29. `be71908` — `package-lock.json`, `npm ci` e validazione `DRIVE_API_KEY` in CI
 - **Messaggio:** `CI: add package-lock.json, use npm ci, and validate DRIVE_API_KEY`
 - **File modificati:** `.github/workflows/pages.yml`, `package-lock.json`, `package.json`
-- **Modifica:** Aggiunto il lockfile NPM, configurato `npm ci` nella pipeline GitHub Pages e aggiunta la verifica sulla presenza di `DRIVE_API_KEY` prima del build.
+- **Modifica:** Aggiunto il lockfile NPM, configurato `npm ci` nella pipeline GitHub Pages e aggiunta la verifica sulla presenza di `DRIVE_API_KEY` e del segnaposto in `environment.ts` prima del build.
 
 ---
 
-### 29. `746cbb1` — Schede personaggio Google Sheets incorporate (`/scheda/:id`)
+### 30. `746cbb1` — Schede personaggio Google Sheets incorporate (`/scheda/:id`)
 - **Messaggio:** `Feature: embed Google Sheets character sheets (/scheda/:id) with read-only default and menu toggle`
 - **File modificati:** `src/app/sheet.component.ts` (nuovo), `src/app/models.ts`, `src/app/drive.service.ts`, `src/app/lookup.service.ts`, `src/app/folder.component.ts`, `src/app/home.component.ts`, `src/app/app.routes.ts`, `src/styles.css` (`+181 / -8`)
 - **Problema:** Le schede personaggio nel Drive (Google Sheets con formule e Apps Script collegati) erano classificate come `'other'` e quindi invisibili nell'app.
@@ -345,7 +371,14 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 
 ---
 
-### 30. `74218b3` — Livello `0,5` per i trucchetti di livello 0 nel calcolatore oggetti magici
+### 31. `59ea1a3` — Aggiornamento wiki per schede Google Sheets
+- **Messaggio:** `Docs: update wiki for embedded Google Sheets character sheets and daily commit log`
+- **File modificati:** 7 file in `wiki/`
+- **Modifica:** Documentata la nuova rotta `/scheda/:id`, `SheetComponent`, `NodeKind = 'gsheet'` e aggiornato il registro commit.
+
+---
+
+### 32. `74218b3` — Livello `0,5` per i trucchetti di livello 0 nel calcolatore oggetti magici
 - **Messaggio:** `Fix: treat level 0 cantrips as 0.5 in magic item cost calculation`
 - **File modificati:** `src/app/item-calc.ts`, `src/app/item-calc.component.ts` (`+19 / -8`)
 - **Problema:** Selezionando un trucchetto di livello 0 senza variazioni (o con variazioni che si compensano riportando il livello finale a `0`), `calcItem()` moltiplicava per `0` restituendo `0 numen` invece di applicare la regola del manuale (`0,5`).
@@ -354,6 +387,27 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
   - Aggiornata la formula esplicita (`0° livello (vale 0,5)`), l'indicazione in UI `(considerato 0,5 nel calcolo)`, la nota nei parametri e `partValue()` sugli oggetti composti.
   - Verificato che tutti i 182 preset del Compendio in `item-presets.ts` restano pienamente allineati (0 discrepanze).
 - **Beneficio:** Gli oggetti magici basati su trucchetti di livello 0 producono il costo corretto coerente con il manuale (es. `Celerity` = 500 numen, arma `Flaming` = 2.000 numen, `Everburning Torch` = 750 numen, pozione di livello 0 = 25 gp).
+
+---
+
+### 33. `3be8d9a` — Aggiornamento wiki per pricing `0,5` dei trucchetti
+- **Messaggio:** `Docs: update wiki for level 0 cantrip 0.5 item pricing and commit log`
+- **File modificati:** `wiki/02 - Funzionalità/Calcolatore Oggetti Magici.md`, `wiki/03 - Riferimento Tecnico/Modelli Dati.md`, `wiki/05 - Analisi e Manutenzione/Registro Commit 2026-11-26.md`
+- **Modifica:** Documentata la regola `effectiveLevel = 0.5` nel calcolatore e nei modelli dati.
+
+---
+
+### 34. `3f156f6` — Allineamento pagine tecniche wiki (CI, `package-lock`, `DocComponent`)
+- **Messaggio:** `Docs: align technical wiki pages with CI workflow, package-lock, and DocComponent race-condition guards`
+- **File modificati:** 4 pagine in `wiki/`
+- **Modifica:** Aggiornati `Stack e Configurazione`, `Setup, Build e Deploy`, `Mappa Completa dei File` e `Navigazione e Lettura Documenti` rispetto al workflow CI e alle guardie di `DocComponent`.
+
+---
+
+### 35. `d52912c` — Rimozione filtro `availableLetters` dalla barra A–Z del Bestiario
+- **Messaggio:** `Refactor: remove unused availableLetters disabled filter in Bestiary alpha bar`
+- **File modificati:** `src/app/bestiary.component.ts`, `src/styles.css` (`+1 / -10`)
+- **Modifica:** Rimossi il segnale `availableLetters`, l'attributo `[disabled]` sui pulsanti `.alpha` e la regola CSS `.alpha:disabled`: con ~2.080 creature estratte tutte le 27 lettere (`A`–`Z` e `#`) sono sempre popolate, semplificando il codice.
 
 ---
 

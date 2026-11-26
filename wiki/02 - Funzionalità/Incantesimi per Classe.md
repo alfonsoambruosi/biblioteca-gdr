@@ -46,7 +46,7 @@ Il `computed` `book()` si aggiorna a ogni cambio di `library.version()` e costru
 
 - **Chip delle liste**: ordinati mettendo sempre **Mago (`arcane`)** per primo, e poi le altre liste per numero decrescente di incantesimi; ogni chip mostra il conteggio totale.
 - **Chip dei livelli**: generati dinamicamente dalle chiavi numeriche della lista selezionata, in ordine crescente. Quando si cambia lista con `pick(key)`, se il livello selezionato non esiste nella nuova lista (es. passando da Mago livello 0 a Ladro che parte da livello 1), seleziona automaticamente il primo livello disponibile.
-- **Filtro testuale**: campo `search` istantaneo (`filter` signal) case-insensitive sul nome; le voci risultanti sono ordinate alfabeticamente (`localeCompare('en', { sensitivity: 'base' })`).
+- **Filtro testuale**: campo `search` con debounce di `120 ms` (`filter` signal, azzeramento istantaneo se svuotato) case-insensitive sul nome; le voci risultanti sono ordinate alfabeticamente (`localeCompare('en', { sensitivity: 'base' })`).
 - **Metadato a destra**: nome del documento di origine per le spell del Drive, oppure `<Abilità> · Ladro` / `Mano d'Ombra (Tome of Battle) · livello N`.
 
 ---

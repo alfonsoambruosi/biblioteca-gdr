@@ -99,8 +99,8 @@ Le modifiche ai documenti sul Drive si propagano automaticamente ai client al su
 
 1. Aprire l'app su un browser già sincronizzato.
 2. In Home aprire **Copia per il caricamento rapido** → cliccare **Scarica la copia**.
-3. Il browser scaricherà `snapshot-1.jsonl`, `snapshot-2.jsonl`, … (max ~15 MB ciascuno).
-4. Sostituire i file in `src/assets/` rimuovendo eventuali `snapshot-N.jsonl` in eccesso rispetto al nuovo conteggio (altrimenti `importSnapshot()` continuerebbe a scaricare vecchie partizioni!).
+3. Il browser scaricherà due serie separate: `snapshot-core-1.jsonl`, `snapshot-core-2.jsonl`, … (regole core + `tree`) e `snapshot-bestiary-1.jsonl`, `snapshot-bestiary-2.jsonl`, … (schede Bestiario, max ~15 MB ciascuno).
+4. Sostituire i file in `src/assets/` rimuovendo eventuali partizioni `snapshot-core-N.jsonl` / `snapshot-bestiary-N.jsonl` in eccesso rispetto al nuovo conteggio (altrimenti `importSnapshot()` continuerebbe a scaricare vecchie partizioni!).
 5. Committare e fare push su `main`.
 
 > [!tip] Inclusione nel build

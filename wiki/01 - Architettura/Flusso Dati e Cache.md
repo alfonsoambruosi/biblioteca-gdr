@@ -26,13 +26,13 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Parser
 ## Filosofia offline-first e politica di sincronizzazione
 
 L'app è progettata per minimizzare il traffico verso Google Drive e funzionare anche offline:
-1. **All'apertura normale** (`LibraryService.start()`): carica istantaneamente albero e metadati da **IndexedDB** senza contattare Google Drive (fa `verify()` solo se IndexedDB è vuoto).
+1. **All'apertura normale** (`LibraryService.start()`): carica istantaneamente albero, metadati (`getMany`) e indice `MiniSearch` persistito (`searchIndex`) da **IndexedDB** senza contattare Google Drive (fa `verify()` solo se IndexedDB è vuoto). `setTree()` viene chiamato solo dopo aver caricato i `meta:*`, evitando falsi `stale` su schede aperte direttamente su `/doc/:id`.
 2. **A login e logout** (`LibraryService.verify()`):
-   - Importa eventuali file **snapshot precompilati** (`assets/snapshot-1..50.jsonl`) non ancora caricati sul dispositivo.
+   - Importa eventuali file **snapshot precompilati** in due fasi: `assets/snapshot-core-1..N.jsonl` (atteso subito) + `assets/snapshot-bestiary-1..N.jsonl` (in background), con fallback automatico al formato legacy `assets/snapshot-1..50.jsonl`.
    - Scarica l'elenco aggiornato di cartelle e file da Google Drive (**Fase 1**, attesa da login/logout fino a 15 s).
    - Rimuove dalla cache e dall'indice i file eliminati dal Drive.
-   - Avvia in background (**Fase 2**, pool di 2 worker) il download e parsing dei soli file **stale** (nuovi, con `modifiedTime` cambiato, rinominati o letti con una `PARSER_VERSION` precedente).
-3. **Durante la consultazione**: nessun polling automatico; se l'utente apre un documento non ancora scaricato o stale, `getHtml(id)` lo scarica on-demand tramite `sync(node)`.
+   - Avvia in background (**Fase 2**, pool di 2 worker) il download e parsing dei soli file **stale** (nuovi, con `modifiedTime` cambiato, rinominati o letti con una `PARSER_VERSION` precedente), coordinandosi con `bestiaryImporting` per non riscaricare dal Drive schede già presenti nello snapshot del Bestiario.
+3. **Durante la consultazione**: nessun polling automatico; se l'utente apre un documento non ancora scaricato o stale, `getHtml(id)` attende `loadCache()` e lo scarica on-demand tramite `sync(node)` (con fallback sicuro alla copia salvata se Drive fallisce o manca la chiave API).
 
 ```mermaid
 sequenceDiagram
@@ -45,9 +45,9 @@ sequenceDiagram
 
     U->>L: Login o Logout
     L->>LS: verify() [timeout UI 15s]
-    LS->>IDB: loadCache() (tree, meta:*, lastCheck)
-    LS->>S: importSnapshot() (streaming NDJSON, skip se snapshotAt uguale)
-    S-->>IDB: setMany(html:*, meta:*, snapshotAt)
+    LS->>IDB: loadCache() via getMany (tree, meta:*, lastCheck, searchIndex)
+    LS->>S: importSnapshot() (Core subito; Bestiary in background)
+    S-->>IDB: setMany(html:*, meta:*, snapshotCoreAt / snapshotBestiaryAt)
     LS->>D: buildTree(driveRootId)
     D-->>LS: TreeNode aggiornato (+ mergeGroups)
     LS->>IDB: set('tree', tree) & del file rimossi
@@ -55,8 +55,8 @@ sequenceDiagram
     par Fase 2 (background, pool=2)
         LS->>D: downloadBinary / downloadText per file stale
         D-->>LS: ArrayBuffer / string
-        LS->>LS: mammoth.convertToHtml + enrichHtml()
-        LS->>IDB: set('html:id'), set('meta:id')
+        LS->>LS: import('mammoth') + WebP compress + enrichHtml()
+        LS->>IDB: set('html:id'), set('meta:id'), flush searchIndex
         LS->>LS: MiniSearch addAll() + version++
     end
 ```
@@ -114,6 +114,7 @@ Incapsula tutte le chiamate HTTP verso `https://www.googleapis.com/drive/v3`.
 | `tree` | `TreeNode \| null` | Albero corrente della biblioteca |
 | `status` | `'idle' \| 'checking' \| 'syncing' \| 'error'` | Stato della sincronizzazione |
 | `statusText` | `string` | Messaggio testuale corrente |
+| `bestiaryStatus` | `string` | Avanzamento del caricamento in background di `snapshot-bestiary-N.jsonl` |
 | `total` / `done` | `number` | Avanzamento download dei file stale |
 | `fatalError` | `string` | Errore bloccante di lettura Drive / API key mancante |
 | `docErrors` | `Record<string, string>` | Mappa `docId -> errore` per singoli file falliti |
@@ -125,7 +126,7 @@ Incapsula tutte le chiamate HTTP verso `https://www.googleapis.com/drive/v3`.
 - Deduplica richieste concorrenti sullo stesso documento tramite la mappa `inflight`.
 - Supporta sia file singoli che documenti uniti (`node.parts ?? [node]`):
   - Se unito, assegna prefissi di ancora `p0`, `p1`, … e antepone `<h1>Nome parte</h1>`; altrimenti prefisso `s`.
-  - Per `docx`/`gdoc`: converte l'`ArrayBuffer` con `mammoth.convertToHtml` usando `STYLE_MAP` (`Title => h1:fresh`, `Subtitle => h2:fresh`), poi passa l'HTML a `enrichHtml()` (vedi [[Parser, Formule Spell e Lookup]]).
+  - Per `docx`/`gdoc`: carica `mammoth/mammoth.browser` via `import()` dinamico in parallelo al download, converte l'`ArrayBuffer` con `mammoth.convertToHtml` usando `STYLE_MAP` (`Title => h1:fresh`, `Subtitle => h2:fresh`) e ricomprime le immagini raster incorporate in WebP (`max 700 px`, `q = 0.65`) tramite `compressImageToDataUri()` (`src/app/image-compress.ts`), poi passa l'HTML a `enrichHtml()` (vedi [[Parser, Formule Spell e Lookup]]).
   - Per `text`: racchiude il testo escapato in `<pre class="plain">...</pre>` e crea una singola sezione `level: 1`.
 - Salva in IndexedDB:
   - `html:<docId>` → stringa HTML arricchita
@@ -172,7 +173,8 @@ Per evitare che ogni nuovo dispositivo debba scaricare e convertire centinaia di
   - `searchOptions: { boost: { heading: 3 }, prefix: true }`
   - Tokenizzazione Unicode (`[^\p{L}\p{N}’']+`), normalizzazione lowercase senza apostrofi.
   - Ogni sezione è indicizzata come documento con chiave `${docId}#${sectionId}`.
+- **Persistenza indice `MiniSearch`**: salvato in IndexedDB sotto la chiave `searchIndex` (`ms.toJSON()`) con firma di validazione `sig` su `(id, modifiedTime, parser, sections.length)` e ripristinato in modo asincrono non bloccante tramite `MiniSearch.loadJSAsync()`. Le mappe `sectionMaps` (`docId -> Map<sectionId, Section>`) e `headingCache` rendono `O(1)` il recupero delle sezioni durante la ricerca.
 - **Glossario cliccabile (`linkTerms()`)**:
   - Memoizzato rispetto a `this.version()`.
-  - Raccoglie tutte le sezioni con `level >= 3` e `heading.length >= 5` (fino a 80 caratteri), escludendo `GENERIC_HEADINGS` (18 titoli generici come `benefit`, `special`, `prerequisite`, `notes`, `example`, `table`, ecc.).
-  - Ordina i documenti mettendo **prima i documenti non-Bestiario e poi il Bestiario**, e dà precedenza ai nomi pieni (`full`) rispetto ai derivati (`derived`), passando poi tutto a `buildTermMap()` (vedi [[Parser, Formule Spell e Lookup]]).
+  - Raccoglie tutte le sezioni con `level >= 3` e `heading.length >= 5` (fino a 80 caratteri), escludendo `GENERIC_HEADINGS` (18 titoli generici come `benefit`, `special`, `prerequisite`, `notes`, `example`, `table`, ecc.), **più le voci editoriali in `CUSTOM_ENTRIES`** (`src/app/custom-entries.ts`, es. `Effect-Specific Spell [Metamagic]`).
+  - Ordina i documenti mettendo **prima i documenti non-Bestiario e poi il Bestiario**, e dà precedenza ai nomi pieni (`full`) rispetto ai derivati (`derived`), passando poi tutto a `buildTermMap()` che costruisce anche `firstWordMax` (vedi [[Parser, Formule Spell e Lookup]]).
