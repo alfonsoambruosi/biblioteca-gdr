@@ -12,7 +12,13 @@ const SESSION_KEY = 'bgdr-session';
 
 function readSession(): boolean {
   try {
-    return sessionStorage.getItem(SESSION_KEY) === 'ok';
+    if (localStorage.getItem(SESSION_KEY) === 'ok') return true;
+    // Migra eventuale sessione già attiva nella scheda corrente (da sessionStorage).
+    if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
+      localStorage.setItem(SESSION_KEY, 'ok');
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -20,16 +26,24 @@ function readSession(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  /** true = utente autenticato in questa scheda del browser. */
+  /** true = utente autenticato nel browser (condiviso tra tutte le schede). */
   readonly loggedIn = signal(readSession());
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', ev => {
+        if (ev.key === SESSION_KEY) this.loggedIn.set(ev.newValue === 'ok');
+      });
+    }
+  }
 
   login(user: string, pass: string): boolean {
     const ok = user.trim() === LOGIN_USER && pass === LOGIN_PASS;
     if (ok) {
       try {
-        sessionStorage.setItem(SESSION_KEY, 'ok');
+        localStorage.setItem(SESSION_KEY, 'ok');
       } catch {
-        /* sessionStorage non disponibile: resta valido finché la pagina è aperta */
+        /* localStorage non disponibile: resta valido finché la pagina è aperta */
       }
       this.loggedIn.set(true);
     }
@@ -38,6 +52,7 @@ export class AuthService {
 
   logout(): void {
     try {
+      localStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem(SESSION_KEY);
     } catch {
       /* ignora */

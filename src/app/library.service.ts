@@ -155,8 +155,7 @@ export class LibraryService {
     ];
     if (last) this.lastCheck.set(new Date(last));
     if (cached) {
-      this.setTree(cached);
-      const files = this.files();
+      const files = this.files(cached);
       const loaded = files.length
         ? await getMany<DocMeta | undefined>(files.map(f => `meta:${f.id}`))
         : [];
@@ -193,6 +192,8 @@ export class LibraryService {
         this.ms.addAll(allDocs);
         this.scheduleSaveIndex(200);
       }
+      // Espone tree() solo dopo aver caricato i metadati, evitando falsi "stale" su nuove schede aperte direttamente su /doc/:id
+      this.setTree(cached);
     }
     this.version.update(v => v + 1);
   }
@@ -596,13 +597,13 @@ export class LibraryService {
     return n.kind === 'docx' || n.kind === 'gdoc' || n.kind === 'text';
   }
 
-  private files(): TreeNode[] {
+  private files(root?: TreeNode | null): TreeNode[] {
     const out: TreeNode[] = [];
     const walk = (n: TreeNode) => {
       if (n.kind === 'folder') n.children?.forEach(walk);
       else if (this.isReadable(n)) out.push(n);
     };
-    const t = this.tree();
+    const t = root === undefined ? this.tree() : root;
     if (t) walk(t);
     return out;
   }
@@ -746,13 +747,22 @@ export class LibraryService {
   /** HTML di un documento: dalla copia salvata; se manca lo scarica subito. */
   async getHtml(id: string): Promise<string> {
     if (id === CUSTOM_DOC_ID) return customDocHtml();
+    await this.loadCache();
     const node = this.nodes.get(id);
     if (!node) throw new Error('Documento non trovato nel Drive.');
-    if (this.isStale(node)) await this.sync(node);
     let html = await get<string>(`html:${id}`);
-    if (html == null) {
-      await this.sync(node);
-      html = await get<string>(`html:${id}`);
+    if (html == null || this.isStale(node)) {
+      if (this.configured) {
+        try {
+          await this.sync(node);
+          html = await get<string>(`html:${id}`);
+        } catch (e) {
+          // Se siamo offline o Drive fallisce, usa comunque la copia salvata se presente.
+          if (html == null) throw e;
+        }
+      } else if (html == null) {
+        throw new Error('Documento non ancora disponibile in cache locale (chiave API Drive non configurata).');
+      }
     }
     return html ?? '';
   }
