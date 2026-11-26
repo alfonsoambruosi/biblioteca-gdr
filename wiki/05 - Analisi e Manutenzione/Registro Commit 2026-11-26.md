@@ -64,6 +64,8 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 35 | `d52912c` | Refactor | Rimossa logica `availableLetters` / `[disabled]` dalla barra alfabetica A–Z del Bestiario (tutte le 27 lettere sono presenti) | Locale |
 | 36 | `a660d8d` | Docs | Riallineamento completo di tutte le 15 pagine della wiki Obsidian allo stato reale del codice | Locale |
 | 37 | `551e364` | Fix | Ripristino stato `idle` in `LibraryService.checkTree()` durante l'import in background del Bestiario (mostra `bestiaryStatus`) | Locale |
+| 38 | `c03493b` | Docs | Aggiornata wiki per il fix sullo stato in background del Bestiario e registro commit | Locale |
+| 39 | `691bff5` | UX | Clamping su `(change)` per gli input numerici del generatore incontri e gestione `localStorage.clear()` in `AuthService` | Locale |
 
 ### Risultato misurato complessivo (inclusi Bestiario e Schede)
 
@@ -426,6 +428,20 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 - **Problema:** Quando `checkTree()` terminava il controllo della struttura Drive senza documenti Core stale mentre `snapshot-bestiary-1..8.jsonl` stava ancora scaricando in background, `status` restava fermo su `'checking'` (*"Controllo il Drive…"*), nascondendo `bestiaryStatus` nella barra `.sync` di `ShellComponent`.
 - **Modifica:** Se `!coreStale.length`, reimpostati subito `status = 'idle'` e `statusText = ''` prima di attendere in background `pendingBestiary`.
 - **Beneficio:** La barra di stato mostra correttamente l'avanzamento `"Carico il Bestiario in background (parte N)…"` al primo accesso.
+
+---
+
+### 38. `c03493b` — Aggiornamento wiki per il fix stato Bestiario
+- **Messaggio:** `Docs: update wiki for background bestiary status fix and commit log`
+- **File modificati:** `wiki/01 - Architettura/Flusso Dati e Cache.md`, `wiki/05 - Analisi e Manutenzione/Registro Commit 2026-11-26.md`
+- **Modifica:** Aggiornati flusso cache e registro commit con `a660d8d` e `551e364`.
+
+---
+
+### 39. `691bff5` — Micro-rifiniture UX su Generatore incontri e `AuthService`
+- **Messaggio:** `UX: clamp encounter number inputs on change and handle localStorage.clear in AuthService`
+- **File modificati:** `src/app/bestiary.component.ts`, `src/app/auth.service.ts` (`+15 / -9`)
+- **Modifica:** Spostato il clamping dei campi numerici *Numero giocatori* (`1–12`) e *Livello medio gruppo* (`1–20`) da `(input)` a `(change)` (così si può cancellare e riscrivere il numero liberamente senza salti a `1`), e gestito `ev.key === null` nel listener `storage` di `AuthService` per sincronizzare il logout anche in caso di `localStorage.clear()` da un'altra scheda.
 
 ---
 

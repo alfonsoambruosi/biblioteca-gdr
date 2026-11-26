@@ -1,14 +1,16 @@
 # Biblioteca GDR
 
-Sito responsive (PC, notebook, tablet, smartphone) che legge la cartella Google Drive e mostra i documenti `.docx`, Google Docs e file di testo con:
+Sito responsive (PC, notebook, tablet, smartphone) che legge la cartella Google Drive e mostra i documenti `.docx`, Google Docs, Google Sheets (schede personaggio incorporate) e file di testo con:
 - ricerca full-text su regole e ricerca dedicata al Bestiario;
-- schede delle spell con formule interattive e descrizione di ogni componente;
+- **Bestiario filtrabile** (`/bestiario`) per singola creatura (~2.080 voci) con barra CR, filtri e **generatore di incontri casuali**;
+- **schede personaggio Google Sheets** incorporate (`/scheda/:id`) con modalità *Solo lettura* di default, *Modifica* e toggle barra menu per gli Apps Script;
+- schede delle spell con formule interattive e descrizione di ogni componente (inclusa la voce editoriale `Effect-Specific Spell`);
 - collegamenti automatici nei testi per feat, talenti, spell e altre voci della biblioteca;
-- elenco degli incantesimi per classe e livello;
-- calcolatore per la creazione di oggetti magici (in *numen* e *gp*);
-- copia precompilata (`snapshot-*.jsonl`) per il caricamento rapido su nuovi dispositivi.
+- elenco degli incantesimi per classe e livello (`/incantesimi`);
+- calcolatore per la creazione di oggetti magici in *numen* e *gp* (`/oggetti`, con livello 0 valutato `0,5`);
+- copia precompilata divisa per priorità (`snapshot-core-*.jsonl` caricato subito + `snapshot-bestiary-*.jsonl` in background).
 
-- Accesso dell'app: utente `admin`, password `0000` (modificabili in `src/app/auth.service.ts`).
+- Accesso dell'app: utente `admin`, password `0000` (modificabili in `src/app/auth.service.ts`; sessione salvata in `localStorage` e condivisa tra schede).
 - Il Drive viene confrontato con la copia salvata **a ogni login e a ogni logout**. Se ci sono differenze,
   l'app scarica solo i file nuovi o modificati, rimuove quelli cancellati e poi procede. Durante l'uso
   non c'è nessun aggiornamento automatico.
@@ -43,10 +45,10 @@ Se pubblichi con GitHub Pages, non inserire la chiave nel file: segui `GITHUB-PA
 
 ## Passo 4 — Prova in locale (facoltativo ma consigliato)
 
-Serve [Node.js](https://nodejs.org/) versione LTS. Dalla cartella del progetto:
+Serve [Node.js](https://nodejs.org/) `>= 22.12.0` (LTS). Dalla cartella del progetto:
 
 ```bash
-npm install
+npm ci
 npm start
 ```
 
@@ -78,15 +80,17 @@ Le modifiche ai **documenti** nel Drive non richiedono nessuna nuova pubblicazio
 
 ## Come funziona
 
-- **Categorie e cartelle:** la schermata iniziale mostra le cartelle presenti nella radice del Drive (es. *Manuale* con *Bestiary*, *Classes*, *Skills, Feats, etc*, e *Schede*), oltre alle card degli strumenti (*Incantesimi per classe* e *Creazione oggetti magici*) ed eventuali file sciolti. Ogni categoria e file riceve automaticamente un'icona tematica.
+- **Categorie e cartelle:** la schermata iniziale mostra le cartelle presenti nella radice del Drive (es. *Manuale* con *Bestiary*, *Classes*, *Skills, Feats, etc*, e *Schede*), oltre alle tre card degli strumenti (**Bestiario**, **Incantesimi per classe**, **Creazione oggetti magici**) ed eventuali file sciolti. Ogni categoria e file riceve automaticamente un'icona tematica.
+- **Bestiario filtrabile e Generatore incontri (`/bestiario`):** espande le 629 schede del Bestiario in **~2.080 singole creature** con link diretto alla sezione (`#s-N`), barra Grado di Sfida (CR) a doppio cursore (`1/8`–`30+`), filtri ordinati (Ordina per, Tipo, Sottocategoria, Ambiente, Taglia), barra alfabetica A–Z, vista per cartelle e **Generatore di incontri casuali** (XP Pathfinder 1e/3.5, 7 difficoltà DOOM da `−1` a `+5`, composizioni e regolazione `−`/`+`/`Cambia`). Lo stato di filtri e incontro viene preservato tornando indietro dalle schede.
+- **Schede personaggio Google Sheets (`/scheda/:id`):** i fogli Google Sheets nel Drive sono incorporati a larghezza piena direttamente nell'app senza rompere formule, trigger né Apps Script collegati, con partenza di default in **Solo lettura**, pulsante **Modifica**, checkbox **Mostra menu** (per mostrare i menu degli script in *Modifica*) e link diretto **Apri in Google Sheets ↗**.
 - **Ricerca globale:** la barra in alto cerca in tutto il testo delle regole (escludendo il Bestiario, così le centinaia di schede mostro non sommergono i risultati). I risultati mettono prima i titoli esatti, poi quelli che iniziano con la parola cercata e infine il testo completo; un clic apre il documento sul punto esatto. Le frasi tra virgolette (`"..."`) cercano la sequenza esatta.
-- **Ricerca nel Bestiario:** entrando nella cartella *Bestiary* (o in una delle sue sottocartelle) compare una barra di ricerca dedicata che cerca in tempo reale solo nelle schede del Bestiario.
-- **Google Docs e Markdown:** i Google Docs vengono letti come `.docx`; i file `.md` e `.txt` come testo semplice.
+- **Ricerca nel Bestiario:** entrando nella cartella *Bestiary* (o in una delle sue sottocartelle) compare il link rapido al Bestiario filtrabile e una barra di ricerca dedicata che cerca in tempo reale solo nelle schede del Bestiario.
+- **Google Docs, Google Sheets e Markdown:** i Google Docs vengono letti come `.docx` (con compressione automatica delle immagini in WebP); i Google Sheets si aprono incorporati in `/scheda/:id`; i file `.md` e `.txt` come testo semplice.
 - **Ch 8 e Ch 8a uniti:** i file "Ch 8 - Spells" e "Ch 8a - Spells Grimoire" appaiono come un solo documento
   (la regola è in `mergeGroups`, `src/environments/environment.ts`). I file originali nel Drive non cambiano.
 - **Formule delle spell:** ogni formula (es. `Fireball: Jet of flame (0 level) + Reach Spell (…) = 3rd level`)
   ha il pulsante **Mostra la descrizione di ogni componente**. Ogni componente è sottolineato: un clic apre
-  in basso la sua descrizione presa dai documenti.
+  in basso la sua descrizione presa dai documenti (inclusa la voce editoriale `Effect-Specific Spell [Metamagic]` in `src/app/custom-entries.ts`).
   - Se il componente è una **spell di livello 0-9** (es. *Jet of flame (0 level)*, sottolineata con linea piena),
     l'app la cerca nei capitoli delle spell: prima come voce con quel titolo, poi come riga di una tabella
     di varianti (*Jet of flame* è nella tabella di *Acid Splash*), poi come voce "Nome: formula" di Ch 8a.
@@ -95,7 +99,7 @@ Le modifiche ai **documenti** nel Drive non richiedono nessuna nuova pubblicazio
 - **Collegamenti automatici nei testi:** aprendo qualsiasi documento (anche nel Bestiario), i nomi di feat, talenti, spell e altre voci del Drive riconosciuti nel testo diventano cliccabili con sottolineatura puntinata e aprono subito la loro descrizione nel riquadro inferiore.
 - **Riquadro descrizioni ridimensionabile:** il pannello inferiore che mostra descrizioni di semi, metamagie e termini collegati si può alzare o abbassare trascinando la barra superiore (o con le frecce su/giù da tastiera, anche con `Shift`); l'altezza scelta viene ricordata sul dispositivo.
 - **Testo originale:** il testo viene mostrato come nei file, senza abbreviazioni né traduzioni.
-- **Cache e copia precompilata:** i documenti già letti restano nel browser (IndexedDB). Se un file cambia nel Drive, viene riletto da solo. Dalla Home, la sezione **Copia per il caricamento rapido** permette di esportare tutti i documenti in file `snapshot-1.jsonl`, `snapshot-2.jsonl`, … (da ~15 MB ciascuno) da salvare in `src/assets/` per velocizzare il primo accesso su nuovi dispositivi (vedi `GITHUB-PAGES.md`).
+- **Cache e copia precompilata:** i documenti già letti e l'indice `MiniSearch` restano nel browser (IndexedDB). Se un file cambia nel Drive, viene riletto da solo. Dalla Home, la sezione **Copia per il caricamento rapido** permette di esportare tutti i documenti in due serie separate — `snapshot-core-1..N.jsonl` (regole core, caricate subito al login) e `snapshot-bestiary-1..N.jsonl` (schede mostri, caricate in background) — da salvare in `src/assets/` (vedi `GITHUB-PAGES.md`).
 
 ## Incantesimi per classe
 
@@ -113,9 +117,9 @@ Dalla Home, la card **Creazione oggetti magici** (`/oggetti`) calcola il costo d
 
 - **Preset del Compendio:** 182 oggetti precompilati (134 oggetti magici/armi in *numen*, 46 alchimia e veleni in *gp a dose*, 2 munizioni) filtrabili per categoria e nome. Caricando un preset vengono compilati spell base, variazioni (incluse quelle escluse dal conteggio del libro), CL, prezzo base e moltiplicatore, e il risultato viene confrontato con il totale stampato nel Compendio.
 - **Calcolo personalizzato:** scegli una spell base arcana, aggiungi **metamagie**, **talenti**, **potenziamenti abilità**, **proprietà** (letti dalla biblioteca e dal Compendio) o **variazioni manuali**. Ogni variazione può essere inclusa/esclusa o modificata nei livelli.
-- **Unità *numen* e *gp*:**
-  - *Numen* (oggetti magici, armi, munizioni): `livello finale × CL × prezzo base × moltiplicatore`.
-  - *Alchimia e veleni* (`gp` a dose): applica il minimo di 25 gp per livello 0 e calcola automaticamente la **scorta privata** in numen (`18 ×` il prezzo in gp).
+- **Unità *numen* e *gp* e trucchetti di livello 0:**
+  - Formula generale: `livello effettivo × CL × prezzo base × moltiplicatore`, dove un **livello finale `0` (trucchetto) vale `0,5`** sia in *numen* sia in *gp*.
+  - *Alchimia e veleni* (`gp` a dose): prezzo base `50 gp` (a livello 0 e CL 1 dà naturalmente `25 gp`) e calcolo automatico della **scorta privata** in numen (`18 ×` il prezzo in gp).
 - **Oggetti composti (più parti):** sezione dedicata a 37 oggetti composti da più parti o con totali particolari nel Compendio. Ogni parte può essere inclusa o esclusa dal totale, con segnalazione automatica se la somma diverge dal totale stampato nel libro.
 
 ## Indice del documento
@@ -142,7 +146,7 @@ nello stesso blocco.
 
 ## Pubblicare su GitHub Pages
 
-Vedi il file `GITHUB-PAGES.md`: passo per passo, con il segreto per la chiave API, la copia precompilata (`snapshot-*.jsonl`) e il flusso automatico in `.github/workflows/pages.yml`.
+Vedi il file `GITHUB-PAGES.md`: passo per passo, con il segreto `DRIVE_API_KEY`, la copia precompilata (`snapshot-core-*.jsonl` + `snapshot-bestiary-*.jsonl`) e il flusso automatico in `.github/workflows/pages.yml`. La documentazione tecnica completa del progetto è raccolta nella mini-wiki Obsidian in `wiki/`.
 
 ## Limiti noti
 
@@ -155,33 +159,42 @@ Vedi il file `GITHUB-PAGES.md`: passo per passo, con il segreto per la chiave AP
 ## Struttura del progetto
 
 ```text
+wiki/                           ← mini-wiki tecnica Obsidian (architettura, funzionalità, registro commit)
 src/
   environments/
-    environment.ts              ← chiave API, ID cartella Drive e mergeGroups
+    environment.ts              ← chiave API (segnaposto), ID cartella Drive e mergeGroups
   assets/
     sfondi/                     ← 5 sfondi pergamena (sfondo-1.jpg … sfondo-5.jpg)
-    snapshot-*.jsonl            ← copia precompilata dei documenti per il caricamento rapido
+    snapshot-core-*.jsonl       ← copia precompilata regole core (caricata subito al login)
+    snapshot-bestiary-*.jsonl   ← copia precompilata Bestiario (caricata in background)
   app/
-    models.ts                   ← tipi principali (TreeNode, Section, DocMeta, SearchHit, Snapshot)
-    auth.service.ts             ← utente e password (sessionStorage)
+    models.ts                   ← tipi principali (NodeKind, TreeNode, Section, DocMeta, SearchHit, Snapshot)
+    auth.service.ts             ← utente e password (localStorage sincronizzato tra schede)
     auth.guard.ts               ← protegge le rotte finché non si accede
     login.component.ts          ← schermata di accesso (/accesso)
     device.ts / device.service.ts ← riconosce PC, tablet o smartphone
     drive.service.ts            ← lettura Google Drive API v3 (con retry e mergeGroups)
-    library.service.ts          ← cache IndexedDB, snapshot, sincronizzazione, ricerca MiniSearch
+    library.service.ts          ← cache IndexedDB, snapshot Core/Bestiario, sincronizzazione, MiniSearch persistente
     doc-parser.ts               ← arricchimento HTML, formule, voci di spell e sezioni
-    lookup.service.ts           ← descrizioni di componenti, semi e indice spellBook
+    image-compress.ts           ← compressione automatica WebP delle immagini incorporate in mammoth
+    lookup.service.ts           ← descrizioni di componenti (O(1) + LRU DOM), semi e indice spellBook
     term-links.ts               ← riconoscimento e collegamento automatico dei nomi nei testi
+    custom-entries.ts           ← voci editoriali del sito (es. Effect-Specific Spell)
     extra-lists.ts              ← elenchi statici Ladro e Mano d'Ombra
     icon.component.ts           ← icone SVG inline per categorie e documenti
     shell.component.ts          ← barra superiore, ricerca globale e barra di sincronizzazione
     home.component.ts           ← Home, categorie, card strumenti ed export snapshot
-    folder.component.ts         ← navigazione cartelle e sottocartelle
-    bestiary-search.component.ts ← ricerca dedicata al solo Bestiario
-    doc.component.ts            ← lettore documenti, TOC, link nei testi e pannello ridimensionabile
+    folder.component.ts         ← navigazione cartelle, schede e sottocartelle
+    bestiary-search.component.ts ← ricerca dedicata al solo Bestiario nelle cartelle
+    bestiary-index.ts           ← estrazione singole creature (~2.080), CR a fine riga, taglie e ambienti
+    bestiary-state.service.ts   ← persistenza stato Bestiario e ultimo incontro generato
+    encounter-gen.ts            ← motore generazione incontri casuali (XP Pathfinder/3.5, livelli DOOM)
+    bestiary.component.ts       ← pagina Bestiario filtrabile e Generatore incontri (/bestiario)
+    doc.component.ts            ← lettore documenti, TOC, link incrementali e pannello ridimensionabile
+    sheet.component.ts          ← schede personaggio Google Sheets incorporate (/scheda/:id)
     search.component.ts         ← pagina risultati ricerca globale (/cerca)
     spellbook.component.ts      ← incantesimi per classe e livello (/incantesimi)
-    item-calc.ts                ← formula di calcolo costi in numen e gp (scorta privata)
+    item-calc.ts                ← formula di calcolo costi in numen e gp (livello 0 = 0,5; scorta privata)
     item-presets.ts             ← 182 preset da Ch 6a - Item Compendium
     item-composite.ts           ← 37 oggetti composti o con eccezioni del Compendio
     item-calc.component.ts      ← pagina Creazione oggetti magici (/oggetti)

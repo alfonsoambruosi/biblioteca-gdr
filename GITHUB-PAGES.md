@@ -69,10 +69,9 @@ Per evitarlo, puoi pubblicare una copia già pronta. Se la copia è grande, vien
 da circa 15 MB, perché GitHub accetta al massimo 25 MB per file caricato dal browser.
 
 1. Apri la biblioteca su un computer già aggiornato, vai in Home, apri **Copia per il caricamento rapido** e premi **Scarica la copia**.
-   Il browser salva uno o più file: `snapshot-1.jsonl`, `snapshot-2.jsonl`, ...
-2. Su GitHub apri `src/assets`, clicca **Add file → Upload files** e carica **tutti** i file `snapshot-N.jsonl`.
+   Il browser salva due serie di file: `snapshot-core-1.jsonl`, `snapshot-core-2.jsonl`, … (regole core) e `snapshot-bestiary-1.jsonl`, `snapshot-bestiary-2.jsonl`, … (Bestiario, max ~15 MB ciascuno).
+2. Su GitHub apri `src/assets`, clicca **Add file → Upload files** e carica **tutti** i file `snapshot-core-*.jsonl` e `snapshot-bestiary-*.jsonl`.
 3. Fai il commit come per gli altri file (**Commit directly to the main branch**): il workflow si rilancia da solo.
 
-Quando aggiorni la copia, carica i file nuovi e cancella quelli vecchi che non servono più (es. se prima erano 4 e ora sono 3, elimina il quarto).
-I dispositivi nuovi scaricano questi file in sequenza. Poi il login confronta soltanto la struttura del Drive
-e riscarica i soli documenti cambiati.
+Quando aggiorni la copia, carica i file nuovi e cancella eventuali partizioni vecchie che non servono più (es. se prima `snapshot-bestiary-*` erano 8 e ora sono 7, elimina l'ottavo).
+Al primo accesso su un dispositivo nuovo vengono caricati subito i file `snapshot-core-*` (sbloccando subito le regole) mentre `snapshot-bestiary-*` viene importato in streaming in background; poi il login confronta soltanto la struttura del Drive e riscarica i soli documenti cambiati.
