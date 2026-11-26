@@ -103,12 +103,16 @@ export function enrichHtml(rawHtml: string, docName: string, prefix = 's'): Pars
     }
   }
 
-  // 2) Tabelle in un contenitore scorrevole (utile su smartphone)
+  // 2) Tabelle in un contenitore scorrevole (utile su smartphone) e immagini lazy
   body.querySelectorAll(':scope > table').forEach(tb => {
     const w = dom.createElement('div');
     w.className = 'tbl';
     tb.replaceWith(w);
     w.appendChild(tb);
+  });
+  body.querySelectorAll('img').forEach(img => {
+    img.setAttribute('loading', 'lazy');
+    img.setAttribute('decoding', 'async');
   });
 
   // 3) Formule delle spell (paragrafi e voci di elenco)

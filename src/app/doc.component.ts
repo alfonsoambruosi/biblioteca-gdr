@@ -163,9 +163,11 @@ export class DocComponent {
     this.panel.set(null);
     try {
       const raw = await this.library.getHtml(id);
+      // Assicura loading="lazy" e decoding="async" sulle immagini anche per i documenti già negli snapshot.
+      const optimized = raw.replace(/<img(?=\s(?![^>]*\bloading=))/gi, '<img loading="lazy" decoding="async"');
       // Il contenuto arriva dai tuoi documenti: viene mostrato senza filtri,
       // così restano intatti gli ID, le tabelle e i collegamenti delle formule.
-      this.html.set(this.sanitizer.bypassSecurityTrustHtml(raw));
+      this.html.set(this.sanitizer.bypassSecurityTrustHtml(optimized));
       setTimeout(() => this.linkNames()); // dopo che Angular ha inserito il testo
       this.scrollToFragment();
     } catch (e: any) {
