@@ -241,6 +241,10 @@ export class LibraryService {
       // Prima aggiorna subito le regole core (se stale); poi, terminato l'import locale del Bestiario,
       // scarica dal Drive solo le schede Bestiario eventualmente cambiate dopo lo snapshot.
       const coreStale = files.filter(f => !this.isBestiary(f.id) && this.isStale(f));
+      if (!coreStale.length) {
+        this.status.set('idle');
+        this.statusText.set('');
+      }
       void (async () => {
         if (coreStale.length) await this.downloadStale(coreStale);
         await pendingBestiary;
