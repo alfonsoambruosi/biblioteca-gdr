@@ -40,6 +40,7 @@ flowchart LR
     ROOT --> H["'' -> HomeComponent"]
     ROOT --> F["cartella/:id -> FolderComponent"]
     ROOT --> D["doc/:id -> DocComponent"]
+    ROOT --> S["scheda/:id -> SheetComponent"]
     ROOT --> C["cerca?q=... -> SearchComponent"]
     ROOT --> I["incantesimi -> SpellbookComponent"]
     ROOT --> O["oggetti -> ItemCalcComponent"]
@@ -54,6 +55,7 @@ flowchart LR
 | `/` | `ShellComponent` → `HomeComponent` | `authGuard` | — | Dashboard con categorie, strumenti ed export snapshot |
 | `/cartella/:id` | `ShellComponent` → `FolderComponent` | `authGuard` | — | Contenuto di una cartella (sottocartelle + file + ricerca bestiario se dentro Bestiary) |
 | `/doc/:id` | `ShellComponent` → `DocComponent` | `authGuard` | `#s-N`, `#p0-N`, `#s-fN` | Lettore documenti con TOC, formule interattive e pannello descrizioni |
+| `/scheda/:id` | `ShellComponent` → `SheetComponent` | `authGuard` | — | Scheda personaggio Google Sheets incorporata (`Solo lettura`, `Modifica`, checkbox `Mostra menu`) |
 | `/cerca` | `ShellComponent` → `SearchComponent` | `authGuard` | `?q=...` | Ricerca full-text globale (esclude Bestiario) |
 | `/incantesimi` | `ShellComponent` → `SpellbookComponent` | `authGuard` | — | Liste incantesimi per classe e livello |
 | `/oggetti` | `ShellComponent` → `ItemCalcComponent` | `authGuard` | — | Calcolatore oggetti magici, alchimia e composti |

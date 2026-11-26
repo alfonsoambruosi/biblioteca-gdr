@@ -32,7 +32,7 @@ La Home funge da cruscotto principale e presenta:
 3. **Sezione collassabile `<details class="admin-box">`: *Copia per il caricamento rapido***:
    - Pulsante **Scarica la copia** collegato a `library.exportSnapshot()` (vedi [[Flusso Dati e Cache#Sistema Snapshot precompilati (.jsonl)]]).
    - Mostra stato live (`exporting`, `exportInfo`) in `role="status"`.
-4. **Altri file (`looseFiles`)**: se nella radice del Drive esistono file leggibili (`docx`, `gdoc`, `text`) fuori dalle cartelle, li elenca in fondo con link diretto a `/doc/:id`.
+4. **Altri file (`looseFiles`)**: se nella radice del Drive esistono file leggibili (`isDocNode`: `docx`, `gdoc`, `text`) o Google Sheets (`isSheetNode`: `gsheet`) fuori dalle cartelle, li elenca in fondo con link diretto a `/doc/:id` (o `/scheda/:id` con icona `people` per i fogli).
 
 ---
 
@@ -41,8 +41,8 @@ La Home funge da cruscotto principale e presenta:
 Reagisce al parametro `:id` tramite `toSignal(route.paramMap)` e mostra:
 - **Breadcrumb (`.crumbs`)**: costruito con `library.pathOf(id)` (`Home › Manuale › ...`).
 - **Ricerca Bestiario contestuale**: se `library.isBestiary(id)` è `true` (cioè qualsiasi nodo nel percorso matcha `/bestiar|bestiary/i`), monta `<app-bestiary-search />` in cima alla cartella (vedi [[Ricerca e Bestiario]]).
-- **Sottocartelle (`folders`)**: renderizzate come griglia `.cards` con conteggio documenti.
-- **Documenti (`files`)**: elenco `.list` dei soli nodi leggibili (`isDocNode`: `docx`, `gdoc`, `text`), ciascuno con icona dedicata e link a `/doc/:id`. I file di tipo `'other'` (PDF, fogli di calcolo, ecc.) vengono omessi.
+- **Sottocartelle (`folders`)**: renderizzate come griglia `.cards` con conteggio documenti (`lookup.countFiles()`, che include anche i nodi `gsheet`).
+- **Documenti e schede (`files`)**: elenco `.list` dei nodi leggibili (`isDocNode`: `docx`, `gdoc`, `text` → `/doc/:id`) e dei Google Sheets (`isSheetNode`: `gsheet` → `/scheda/:id` con icona `people`). I file di tipo `'other'` (PDF, binari, ecc.) vengono omessi.
 
 ---
 
@@ -83,3 +83,21 @@ Un unico handler `(click)="onClick($event)"` è agganciato sia al corpo del docu
   - Supporta regolazione da **tastiera** (`ArrowUp` / `ArrowDown` a passi di `20px`, o `80px` con `Shift`).
   - Altezza vincolata fra `PANEL_MIN = 120px` e `window.innerHeight - 40px`.
   - Salvata in `localStorage` sotto la chiave `'bgdr-panel-h'` (default `40%` di `window.innerHeight`).
+
+---
+
+## 4. Schede Personaggio — Google Sheets incorporato (`src/app/sheet.component.ts`, rotta `/scheda/:id`)
+
+Permette di consultare e modificare le schede personaggio presenti nel Drive come Google Sheets (`kind === 'gsheet'`) senza toccare né rompere formule, trigger e Google Apps Script collegati: l'app non scarica né indicizza il foglio, ma lo incorpora direttamente in un `<iframe>` verso `https://docs.google.com/spreadsheets/d/<id>/...`.
+
+### Controlli della barra superiore (`.sheet-bar`)
+Da sinistra a destra, dopo il titolo della scheda:
+1. **`Solo lettura`** *(attiva di default all'apertura)*: carica `.../preview` (anteprima sicura senza rischio di modifiche accidentali).
+2. **`Modifica`**: carica `.../edit?rm=minimal` (foglio modificabile senza barra dei menu, con più spazio utile per aggiornare HP e valori).
+3. **Checkbox `Mostra menu`**: disabilitata in *Solo lettura*; in *Modifica* commuta tra `.../edit?rm=minimal` (deselezionata) e `.../edit` (selezionata), mostrando la barra completa di Google Sheets inclusi i menu personalizzati degli Apps Script.
+4. **Link `Apri in Google Sheets ↗`**: apre `.../edit` in una nuova scheda (`target="_blank" rel="noopener"`), utile come fallback se il browser blocca i cookie di terze parti.
+
+### Layout, sicurezza e permessi
+- **Larghezza piena**: la presenza di `.sheet-wrap` attiva la regola `.page:has(.sheet-wrap) { max-width: none; }` in `src/styles.css`, estendendo l'iframe su tutta la viewport (`height: calc(100dvh - 15rem); min-height: 480px`).
+- **Validazione ID**: l'iframe viene montato solo se l'ID esiste nell'albero Drive come nodo `'gsheet'` e rispetta `/^[A-Za-z0-9_-]+$/`.
+- **Permessi**: la condivisione *"Chiunque abbia il link → Visualizzatore"* basta per la lettura; per modificare è necessario essere autenticati a Google nel browser con un account che abbia permessi di scrittura sul foglio.

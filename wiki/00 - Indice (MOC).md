@@ -45,7 +45,7 @@ updated: 2026-11-26
 - [[Stile e Assets]] — Tema pergamena invecchiata (`styles.css`), variabili CSS, responsive, icone SVG (`IconComponent`) e risorse in `src/assets/`.
 
 ### 02 — Funzionalità
-- [[Navigazione e Lettura Documenti]] — Home, esplorazione cartelle (`FolderComponent`), visualizzatore documenti (`DocComponent`), indice laterale (TOC) e pannello inferiore ridimensionabile.
+- [[Navigazione e Lettura Documenti]] — Home, esplorazione cartelle (`FolderComponent`), visualizzatore documenti (`DocComponent`), schede personaggio Google Sheets (`SheetComponent`), indice laterale (TOC) e pannello inferiore ridimensionabile.
 - [[Ricerca e Bestiario]] — Motore di ricerca full-text (`SearchComponent`), ranking a 3 livelli, separazione del Bestiario e ricerca dedicata (`BestiarySearchComponent`).
 - [[Parser, Formule Spell e Lookup]] — Arricchimento HTML (`doc-parser.ts`), riconoscimento formule/semi, risoluzione descrizioni (`LookupService`) e auto-linking dei termini (`term-links.ts`).
 - [[Incantesimi per Classe]] — Costruzione dinamica delle liste (`SpellbookComponent`), liste statiche (`extra-lists.ts`), Mago + Mano d'Ombra, Ladro e ricerca online di fallback.
@@ -93,6 +93,7 @@ flowchart TB
         HOME["HomeComponent (/)"]
         FOLDER["FolderComponent\n(/cartella/:id)"]
         DOC["DocComponent\n(/doc/:id)"]
+        SHEET["SheetComponent\n(/scheda/:id)"]
         SEARCH["SearchComponent\n(/cerca)"]
         SPELL["SpellbookComponent\n(/incantesimi)"]
         CALC["ItemCalcComponent\n(/oggetti)"]
@@ -106,9 +107,10 @@ flowchart TB
 
     LOGIN --> AS
     LOGIN --> LS
-    SHELL --> HOME & FOLDER & DOC & SEARCH & SPELL & CALC
+    SHELL --> HOME & FOLDER & DOC & SHEET & SEARCH & SPELL & CALC
     DOC --> LS & LKS
     DOC <--> LOC
+    SHEET --> LS
     SEARCH --> LS
     FOLDER --> LS & LKS
     SPELL --> LS & LKS

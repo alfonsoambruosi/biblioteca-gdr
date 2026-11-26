@@ -53,6 +53,9 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 24 | `c11340c` | UX | Persistenza stato Bestiario/Incontro (`BestiaryStateService`), sync `<select>` e pulsante *← Torna* in `DocComponent` | Pushato |
 | 25 | `fa0be28` | UX | Sessione in `localStorage` tra schede + fix race condition `loadCache()`/`getHtml()` all'apertura diretta di `/doc/:id` | Pushato |
 | 26 | `c47a005` | Feature | Espansione per singola creatura (`~2.075` voci) + regex CR a fine riga + link diretti `#s-N` + ricerca per nome | Pushato |
+| 27 | `5694864` | Fix | Prevenzione race condition su caricamento documenti, pannello lookup ed espansione formule | Locale |
+| 28 | `be71908` | CI | Aggiunto `package-lock.json`, passaggio a `npm ci` e validazione `DRIVE_API_KEY` in GitHub Actions | Locale |
+| 29 | `746cbb1` | Feature | Schede personaggio Google Sheets incorporate (`/scheda/:id`), default *Solo lettura*, *Modifica* e checkbox *Mostra menu* | Locale |
 
 ### Risultato misurato complessivo (Tier 1 + Tier 2 + Tier 3)
 
@@ -312,6 +315,32 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 - **Messaggio:** `Feature: expand Bestiary per creature with EOL CR regex, direct anchors, and name-first search`
 - **File modificati:** `src/app/bestiary-index.ts`, `src/app/bestiary.component.ts`, `src/app/encounter-gen.ts` (`+189 / -84`)
 - **Modifica:** Raffinata la regex CR a fine riga (`/(?:^|\s)CR\s*(\d+(?:\/\d+)?|[½¼⅓⅛])\s*$/gim`), espanse le 629 schede in ~2.075 singole creature con link diretto `#s-N` (e sottotitolo `in <Documento>`), deduplicazione per `docId#anchor` nel Generatore, e ricerca del Catalogo ristretta a nome creatura (in cima) seguita dalle creature in pagine con quel nome.
+
+---
+
+### 27. `5694864` — Prevenzione race condition in `DocComponent`
+- **Messaggio:** `Fix: prevent race conditions when loading docs, lookup panel, and formulas`
+- **File modificati:** `src/app/doc.component.ts` (`+65 / -23`)
+- **Modifica:** Protetto il caricamento asincrono di documenti, pannello lookup ed espansione formule contro risposte arrivate fuori ordine in seguito a navigazioni o clic rapidi.
+
+---
+
+### 28. `be71908` — `package-lock.json`, `npm ci` e validazione `DRIVE_API_KEY` in CI
+- **Messaggio:** `CI: add package-lock.json, use npm ci, and validate DRIVE_API_KEY`
+- **File modificati:** `.github/workflows/pages.yml`, `package-lock.json`, `package.json`
+- **Modifica:** Aggiunto il lockfile NPM, configurato `npm ci` nella pipeline GitHub Pages e aggiunta la verifica sulla presenza di `DRIVE_API_KEY` prima del build.
+
+---
+
+### 29. `746cbb1` — Schede personaggio Google Sheets incorporate (`/scheda/:id`)
+- **Messaggio:** `Feature: embed Google Sheets character sheets (/scheda/:id) with read-only default and menu toggle`
+- **File modificati:** `src/app/sheet.component.ts` (nuovo), `src/app/models.ts`, `src/app/drive.service.ts`, `src/app/lookup.service.ts`, `src/app/folder.component.ts`, `src/app/home.component.ts`, `src/app/app.routes.ts`, `src/styles.css` (`+181 / -8`)
+- **Problema:** Le schede personaggio nel Drive (Google Sheets con formule e Apps Script collegati) erano classificate come `'other'` e quindi invisibili nell'app.
+- **Modifica:**
+  - Aggiunto `NodeKind = 'gsheet'` (`application/vnd.google-apps.spreadsheet`) in `models.ts` e `DriveService.kindOf()` e helper `isSheetNode()` in `LookupService` (incluso in `countFiles()`, escluso da download/indicizzazione).
+  - Mostrati i fogli nelle cartelle e in Home con icona `people` e link alla nuova rotta lazy `/scheda/:id`.
+  - Creato `SheetComponent` a larghezza piena (`.page:has(.sheet-wrap)`) con iframe Google Sheets, partenza di default in **Solo lettura** (`/preview`), pulsante **Modifica** (`/edit?rm=minimal`), checkbox **Mostra menu** (disabilitata in *Solo lettura*, commuta `/edit` con i menu degli script in *Modifica*) e link **Apri in Google Sheets ↗**.
+- **Beneficio:** Le schede personaggio sono consultabili e modificabili direttamente dentro l'app senza rompere formule, trigger né Apps Script collegati.
 
 ---
 

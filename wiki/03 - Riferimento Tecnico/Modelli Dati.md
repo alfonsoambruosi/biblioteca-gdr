@@ -25,7 +25,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Flusso Dati e Cache]], [[Mappa Com
 
 | Tipo / Interfaccia | Campi principali | Usato in |
 |---|---|---|
-| `NodeKind` | `'folder' \| 'docx' \| 'gdoc' \| 'text' \| 'other'` | `DriveService`, `LibraryService`, `LookupService`, `HomeComponent`, `FolderComponent` |
+| `NodeKind` | `'folder' \| 'docx' \| 'gdoc' \| 'text' \| 'gsheet' \| 'other'` | `DriveService`, `LibraryService`, `LookupService`, `HomeComponent`, `FolderComponent`, `SheetComponent` |
 | `TreeNode` | `id`, `name`, `kind`, `modifiedTime?`, `size?`, `children?: TreeNode[]`, `parts?: TreeNode[]` | Albero gerarchico del Drive; `parts` è valorizzato solo nei nodi virtuali fusi da `mergeGroups` |
 | `Section` | `id` (es. `s-12`, `p0-4`, `s-f3`), `heading`, `level` (`1..6`), `text` | Unità atomica di indicizzazione (MiniSearch), TOC (`level <= 5`), Spellbook (`level === 5`), formule (`level === 6`) |
 | `DocMeta` | `id`, `name`, `modifiedTime`, `size`, `parser?: number`, `sections: Section[]` | Metadati persistenti in IndexedDB (`meta:<id>`) e negli snapshot |

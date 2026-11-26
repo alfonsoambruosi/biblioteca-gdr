@@ -66,7 +66,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Modell
 | `src/app/drive.service.ts` | `DriveService`, `mergeGroups()`, `displayName()` | Client Google Drive API v3 con semaforo (`MAX_CONCURRENT = 2`), retry esponenziale, fusione gruppi e download |
 | `src/app/library.service.ts` | `LibraryService` | Orchestrazione cache IndexedDB, import/export snapshot NDJSON, sync incrementale, indice `MiniSearch`, ricerca, `linkTerms()`, `isBestiary()` |
 | `src/app/doc-parser.ts` | `PARSER_VERSION`, `enrichHtml()`, `buildFormulaHtml()`, `isFormula()`, `baseLevel()`, `sliceSection()`, `normTerm()`, `tokenKey()`, `esc()` | Parsing DOM dell'HTML di `mammoth`: promozione `h5.spell-entry`, wrapper `.tbl`, markup formule e pulsanti, estrazione `Section[]` |
-| `src/app/lookup.service.ts` | `LookupService`, `EntryRef`, `SpellRef`, `isDocNode()` | Risoluzione voci, spiegazione semi di formula (incluse tabelle varianti), fallback ricerca, costruzione `spellBook()` |
+| `src/app/lookup.service.ts` | `LookupService`, `EntryRef`, `SpellRef`, `isDocNode()`, `isSheetNode()` | Risoluzione voci, spiegazione semi di formula (incluse tabelle varianti), fallback ricerca, costruzione `spellBook()`, conteggio file/schede |
 | `src/app/term-links.ts` | `TermTarget`, `TermMap`, `TextPart`, `termKey()`, `buildTermMap()`, `splitTerms()`, `namesOf()` | Algoritmo *longest-match first* per collegare automaticamente nomi di feat/talenti/spell nei documenti |
 
 ### Componenti UI — Navigazione, Lettura e Ricerca
@@ -77,6 +77,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Modell
 | `src/app/home.component.ts` | `app-home` · `/` | Card categorie Drive, card strumenti, box esportazione snapshot, file sciolti |
 | `src/app/folder.component.ts` | `app-folder` · `/cartella/:id` | Breadcrumb, ricerca bestiario contestuale, sottocartelle e lista file |
 | `src/app/doc.component.ts` | `app-doc` · `/doc/:id` | Visualizzatore HTML, TOC persistente, auto-linking termini, espansione formule, pannello inferiore ridimensionabile |
+| `src/app/sheet.component.ts` | `app-sheet` · `/scheda/:id` | Scheda personaggio Google Sheets incorporata (`<iframe>`): default `Solo lettura`, switch `Modifica`, checkbox `Mostra menu` e link esterno |
 | `src/app/search.component.ts` | `app-search` · `/cerca` | Pagina risultati ricerca globale (esclude Bestiario) |
 | `src/app/bestiary-search.component.ts` | `app-bestiary-search` | Widget di ricerca live limitato al Bestiario, incorporato in `FolderComponent` |
 | `src/app/icon.component.ts` | `app-icon`, `iconFor()` | 9 icone SVG inline + mappatura automatica da nome cartella/file |

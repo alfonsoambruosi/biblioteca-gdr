@@ -81,6 +81,7 @@ Incapsula tutte le chiamate HTTP verso `https://www.googleapis.com/drive/v3`.
 - Classifica i nodi (`kindOf`):
   - `application/vnd.google-apps.folder` → `'folder'`
   - `application/vnd.google-apps.document` → `'gdoc'`
+  - `application/vnd.google-apps.spreadsheet` → `'gsheet'` (non scaricato né indicizzato; elencato in cartelle/home e aperto incorporato in `/scheda/:id`)
   - `application/vnd.openxmlformats-officedocument.wordprocessingml.document` o `.docx` → `'docx'`
   - `text/*` o `.md`/`.txt` → `'text'`
   - Tutto il resto → `'other'` (ignorato da indicizzazione e liste documenti)
