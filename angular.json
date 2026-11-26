@@ -18,6 +18,7 @@
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
+            "assets": ["src/assets"],
             "styles": ["src/styles.css"],
             "allowedCommonJsDependencies": ["mammoth", "mammoth/mammoth.browser", "jszip", "lop", "bluebird", "underscore", "xmlbuilder", "sax", "argparse", "path-is-absolute", "dingbat-to-unicode"]
           },
