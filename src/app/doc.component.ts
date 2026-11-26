@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -102,6 +102,9 @@ export class DocComponent {
   private lookup = inject(LookupService);
   private sanitizer = inject(DomSanitizer);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
+  private linkRun = 0;
+  private linkFrame: number | null = null;
 
   private id = toSignal(this.route.paramMap.pipe(map(p => p.get('id') ?? '')), {
     initialValue: '',
@@ -138,6 +141,7 @@ export class DocComponent {
   private drag: { y: number; h: number } | null = null;
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.cancelLinkNames());
     // Ricarica quando cambia il documento o quando il Drive viene riletto.
     effect(() => {
       const id = this.id();
@@ -146,11 +150,20 @@ export class DocComponent {
         if (this.library.node(id)) {
           void this.load(id);
         } else if (this.library.tree()) {
+          this.cancelLinkNames();
           this.error.set('Documento non trovato nel Drive.');
           this.html.set('');
         }
       });
     });
+  }
+
+  private cancelLinkNames(): void {
+    this.linkRun++;
+    if (this.linkFrame !== null) {
+      cancelAnimationFrame(this.linkFrame);
+      this.linkFrame = null;
+    }
   }
 
   toggleToc(): void {
@@ -159,6 +172,7 @@ export class DocComponent {
   }
 
   private async load(id: string): Promise<void> {
+    this.cancelLinkNames();
     this.loading.set(true);
     this.error.set('');
     this.panel.set(null);
@@ -169,7 +183,10 @@ export class DocComponent {
       // Il contenuto arriva dai tuoi documenti: viene mostrato senza filtri,
       // così restano intatti gli ID, le tabelle e i collegamenti delle formule.
       this.html.set(this.sanitizer.bypassSecurityTrustHtml(optimized));
-      setTimeout(() => this.linkNames()); // dopo che Angular ha inserito il testo
+      const run = this.linkRun;
+      setTimeout(() => {
+        if (run === this.linkRun) this.linkNames(run);
+      }); // dopo che Angular ha inserito il testo
       this.scrollToFragment();
     } catch (e: any) {
       this.error.set(e?.message ?? String(e));
@@ -181,11 +198,11 @@ export class DocComponent {
 
   /**
    * Rende cliccabili i nomi di feat, talenti, spell e altre voci del Drive che compaiono nel testo
-   * (anche nel bestiario). Il clic apre la descrizione, come per le formule.
+   * (anche nel bestiario). Elabora a piccoli blocchi per frame così i documenti grandi non congelano la UI.
    */
-  private linkNames(): void {
+  private linkNames(run: number): void {
     const root = this.contentEl?.nativeElement;
-    if (!root) return;
+    if (!root || run !== this.linkRun) return;
     const terms = this.library.linkTerms();
     if (!terms.map.size) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -197,27 +214,39 @@ export class DocComponent {
     });
     const nodes: Text[] = [];
     while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-    for (const node of nodes) {
-      const parts = splitTerms(node.textContent ?? '', terms);
-      if (parts.length === 1 && !parts[0].ref) continue;
-      const frag = document.createDocumentFragment();
-      for (const part of parts) {
-        if (part.ref) {
-          const span = document.createElement('span');
-          span.className = 'term-link';
-          span.dataset['doc'] = part.ref.docId;
-          span.dataset['anchor'] = part.ref.anchor;
-          span.dataset['heading'] = part.ref.heading;
-          span.dataset['docName'] = part.ref.docName;
-          span.dataset['level'] = String(part.ref.level);
-          span.textContent = part.text;
-          frag.append(span);
-        } else {
-          frag.append(part.text);
+    let idx = 0;
+    const step = () => {
+      this.linkFrame = null;
+      if (run !== this.linkRun) return;
+      const deadline = performance.now() + 10;
+      while (idx < nodes.length && performance.now() < deadline) {
+        const node = nodes[idx++];
+        if (!node.isConnected) continue;
+        const parts = splitTerms(node.textContent ?? '', terms);
+        if (parts.length === 1 && !parts[0].ref) continue;
+        const frag = document.createDocumentFragment();
+        for (const part of parts) {
+          if (part.ref) {
+            const span = document.createElement('span');
+            span.className = 'term-link';
+            span.dataset['doc'] = part.ref.docId;
+            span.dataset['anchor'] = part.ref.anchor;
+            span.dataset['heading'] = part.ref.heading;
+            span.dataset['docName'] = part.ref.docName;
+            span.dataset['level'] = String(part.ref.level);
+            span.textContent = part.text;
+            frag.append(span);
+          } else {
+            frag.append(part.text);
+          }
         }
+        node.replaceWith(frag);
       }
-      node.replaceWith(frag);
-    }
+      if (idx < nodes.length && run === this.linkRun) {
+        this.linkFrame = requestAnimationFrame(step);
+      }
+    };
+    step();
   }
 
   private scrollToFragment(): void {

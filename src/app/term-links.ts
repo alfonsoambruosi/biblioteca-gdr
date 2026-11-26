@@ -16,6 +16,8 @@ export interface TermTarget {
 export interface TermMap {
   map: Map<string, TermTarget>;
   maxWords: number;
+  /** Lunghezza massima (in parole) dei termini che iniziano con ciascuna prima parola. */
+  firstWordMax: Map<string, number>;
 }
 
 export interface TextPart {
@@ -35,34 +37,44 @@ export function termKey(s: string): string {
 /** Costruisce la mappa nome → sezione. Vince il primo inserito per ogni nome. */
 export function buildTermMap(entries: Array<[string, TermTarget]>): TermMap {
   const map = new Map<string, TermTarget>();
+  const firstWordMax = new Map<string, number>();
   let maxWords = 1;
   for (const [name, ref] of entries) {
     const k = termKey(name);
     if (!k || map.has(k)) continue;
+    const words = k.match(TOKEN);
+    if (!words || !words.length) continue;
+    const count = Math.min(words.length, MAX_WORDS);
     map.set(k, ref);
-    const words = (k.match(TOKEN) ?? []).length;
-    if (words > maxWords) maxWords = words;
+    if (count > maxWords) maxWords = count;
+    const first = words[0];
+    if (count > (firstWordMax.get(first) ?? 0)) firstWordMax.set(first, count);
   }
-  return { map, maxWords: Math.min(maxWords, MAX_WORDS) };
+  return { map, maxWords, firstWordMax };
 }
 
 /** Divide il testo in parti normali e parti che corrispondono a un nome. */
 export function splitTerms(text: string, terms: TermMap): TextPart[] {
   if (!terms.map.size) return [{ text }];
-  const toks: { s: number; e: number }[] = [];
+  const toks: { s: number; e: number; low: string }[] = [];
   for (const m of text.matchAll(TOKEN)) {
     const s = m.index ?? 0;
-    toks.push({ s, e: s + m[0].length });
+    toks.push({ s, e: s + m[0].length, low: m[0].toLowerCase() });
   }
   const out: TextPart[] = [];
   let last = 0;
   let i = 0;
   while (i < toks.length) {
+    const maxForFirst = terms.firstWordMax.get(toks[i].low);
+    if (!maxForFirst) {
+      i++;
+      continue;
+    }
     let len = 0;
     let ref: TermTarget | undefined;
-    for (let k = Math.min(terms.maxWords, toks.length - i); k >= 1; k--) {
-      const phrase = text.slice(toks[i].s, toks[i + k - 1].e);
-      const hit = terms.map.get(termKey(phrase));
+    for (let k = Math.min(maxForFirst, toks.length - i); k >= 1; k--) {
+      const key = k === 1 ? toks[i].low : termKey(text.slice(toks[i].s, toks[i + k - 1].e));
+      const hit = terms.map.get(key);
       if (hit) {
         len = k;
         ref = hit;
