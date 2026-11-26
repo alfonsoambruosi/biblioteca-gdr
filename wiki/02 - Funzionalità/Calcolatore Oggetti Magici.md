@@ -37,15 +37,17 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Incantesimi per Classe]], [[Parser
 
 $$\text{Livello finale} = \max\left(0,\; \text{baseLevel} + \sum_{m \in \text{mods attivo}} m.\text{adj}\right)$$
 
-$$\text{Totale} = \text{Livello finale} \times \text{CL} \times \text{price} \times \text{multiplier}$$
+$$\text{Livello effettivo} = \begin{cases} 0{,}5 & \text{se Livello finale} = 0 \\ \text{Livello finale} & \text{altrimenti} \end{cases}$$
+
+$$\text{Totale} = \text{Livello effettivo} \times \text{CL} \times \text{price} \times \text{multiplier}$$
 
 ### Regole speciali per unità di misura
+- **Trucchetti (livello finale `0`)**: nel calcolo del costo (sia `numen` sia `gp`) il livello `0` viene sempre considerato **`0,5`** (es. alchimia a CL 1 e 50 gp = `0,5 × 1 × 50 = 25 gp`; uso attivato CL 1 e 500 numen = `250 numen`).
 - **`unit: 'numen'`** (default — oggetti magici, armi, armature, munizioni):
   - Prezzo base tipico di default: `500` (uso attivato), `900` (a comando), `1000` (continuo), `750` (armi a energia/futuristiche), `50` (uso singolo).
   - `stockNumen = null`.
 - **`unit: 'gp'`** (alchimia e veleni — *gp a dose*):
   - Prezzo base di default: `50 gp` per livello × CL.
-  - **Minimo per livello 0**: se `unit === 'gp' && level === 0`, il totale viene portato almeno a **`25 gp`** (regola del Compendio).
   - **Scorta privata in numen**: `stockNumen = total * STOCK_RATIO`, con `STOCK_RATIO = 18`.
 
 ### Estrazione automatica della variazione di livello (`levelAdjFromText`)

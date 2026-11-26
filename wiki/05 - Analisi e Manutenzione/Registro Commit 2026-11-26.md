@@ -56,6 +56,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 27 | `5694864` | Fix | Prevenzione race condition su caricamento documenti, pannello lookup ed espansione formule | Locale |
 | 28 | `be71908` | CI | Aggiunto `package-lock.json`, passaggio a `npm ci` e validazione `DRIVE_API_KEY` in GitHub Actions | Locale |
 | 29 | `746cbb1` | Feature | Schede personaggio Google Sheets incorporate (`/scheda/:id`), default *Solo lettura*, *Modifica* e checkbox *Mostra menu* | Locale |
+| 30 | `74218b3` | Fix | Calcolatore oggetti magici (`/oggetti`): livello finale `0` (trucchetti) valutato `0,5` nel calcolo del costo | Locale |
 
 ### Risultato misurato complessivo (Tier 1 + Tier 2 + Tier 3)
 
@@ -341,6 +342,18 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
   - Mostrati i fogli nelle cartelle e in Home con icona `people` e link alla nuova rotta lazy `/scheda/:id`.
   - Creato `SheetComponent` a larghezza piena (`.page:has(.sheet-wrap)`) con iframe Google Sheets, partenza di default in **Solo lettura** (`/preview`), pulsante **Modifica** (`/edit?rm=minimal`), checkbox **Mostra menu** (disabilitata in *Solo lettura*, commuta `/edit` con i menu degli script in *Modifica*) e link **Apri in Google Sheets ↗**.
 - **Beneficio:** Le schede personaggio sono consultabili e modificabili direttamente dentro l'app senza rompere formule, trigger né Apps Script collegati.
+
+---
+
+### 30. `74218b3` — Livello `0,5` per i trucchetti di livello 0 nel calcolatore oggetti magici
+- **Messaggio:** `Fix: treat level 0 cantrips as 0.5 in magic item cost calculation`
+- **File modificati:** `src/app/item-calc.ts`, `src/app/item-calc.component.ts` (`+19 / -8`)
+- **Problema:** Selezionando un trucchetto di livello 0 senza variazioni (o con variazioni che si compensano riportando il livello finale a `0`), `calcItem()` moltiplicava per `0` restituendo `0 numen` invece di applicare la regola del manuale (`0,5`).
+- **Modifica:**
+  - Introdotto `effectiveLevel = level === 0 ? 0.5 : level` in `calcItem()` (e in `ItemResult`) per il calcolo del totale sia in `numen` sia in `gp`, rimuovendo il workaround `Math.max(total, 25)` sull'alchimia (che a CL 1 × 50 gp ora produce naturalmente `25 gp`).
+  - Aggiornata la formula esplicita (`0° livello (vale 0,5)`), l'indicazione in UI `(considerato 0,5 nel calcolo)`, la nota nei parametri e `partValue()` sugli oggetti composti.
+  - Verificato che tutti i 182 preset del Compendio in `item-presets.ts` restano pienamente allineati (0 discrepanze).
+- **Beneficio:** Gli oggetti magici basati su trucchetti di livello 0 producono il costo corretto coerente con il manuale (es. `Celerity` = 500 numen, arma `Flaming` = 2.000 numen, `Everburning Torch` = 750 numen, pozione di livello 0 = 25 gp).
 
 ---
 

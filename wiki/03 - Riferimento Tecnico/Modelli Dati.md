@@ -50,7 +50,7 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Flusso Dati e Cache]], [[Mappa Com
 | `icon.component.ts` | `IconKey` | `'dragon' \| 'shield' \| 'scroll' \| 'spell' \| 'gem' \| 'lantern' \| 'people' \| 'book' \| 'folder'` |
 | `item-calc.ts` | `ModKind` | `'metamagia' \| 'talento' \| 'abilita' \| 'proprieta' \| 'manuale'` |
 | `item-calc.ts` | `Modifier` | `{ kind, name, adj, on, source: 'biblioteca' \| 'manuale' }` |
-| `item-calc.ts` | `ItemInput` / `ItemResult` | Input e output di `calcItem()` (con `unit?: 'numen' \| 'gp'`, `stockNumen: number \| null`, `formula: string`) |
+| `item-calc.ts` | `ItemInput` / `ItemResult` | Input e output di `calcItem()` (con `unit?: 'numen' \| 'gp'`, `effectiveLevel: number` = `0.5` se `level === 0`, `stockNumen: number \| null`, `formula: string`) |
 | `item-presets.ts` | `PresetMod`, `ItemPreset` | Scheda numerica preset (`category: 'magico' \| 'alchimia' \| 'munizione'`, `base`, `mods`, `excluded`, `cl`, `price`, `multiplier`, `total`, `stock`, `qualifier`) |
 | `item-composite.ts` | `CompositePart`, `CompositeItem` | Parti `'formula'` o `'fixed'`, `stated`, `unit`, `note?` |
 
