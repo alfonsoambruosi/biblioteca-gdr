@@ -1,0 +1,177 @@
+---
+title: Flusso Dati e Cache
+aliases:
+  - Sincronizzazione Drive
+  - Snapshot e IndexedDB
+  - LibraryService
+  - DriveService
+type: architecture
+tags:
+  - biblioteca-gdr
+  - architettura
+  - google-drive
+  - indexeddb
+  - snapshot
+  - minisearch
+status: completo
+updated: 2026-11-26
+---
+
+# Flusso Dati e Cache
+
+Torna a [[00 - Indice (MOC)]] · Correlati: [[Stack e Configurazione]], [[Parser, Formule Spell e Lookup]], [[Modelli Dati]], [[Setup, Build e Deploy]]
+
+---
+
+## Filosofia offline-first e politica di sincronizzazione
+
+L'app è progettata per minimizzare il traffico verso Google Drive e funzionare anche offline:
+1. **All'apertura normale** (`LibraryService.start()`): carica istantaneamente albero e metadati da **IndexedDB** senza contattare Google Drive (fa `verify()` solo se IndexedDB è vuoto).
+2. **A login e logout** (`LibraryService.verify()`):
+   - Importa eventuali file **snapshot precompilati** (`assets/snapshot-1..50.jsonl`) non ancora caricati sul dispositivo.
+   - Scarica l'elenco aggiornato di cartelle e file da Google Drive (**Fase 1**, attesa da login/logout fino a 15 s).
+   - Rimuove dalla cache e dall'indice i file eliminati dal Drive.
+   - Avvia in background (**Fase 2**, pool di 2 worker) il download e parsing dei soli file **stale** (nuovi, con `modifiedTime` cambiato, rinominati o letti con una `PARSER_VERSION` precedente).
+3. **Durante la consultazione**: nessun polling automatico; se l'utente apre un documento non ancora scaricato o stale, `getHtml(id)` lo scarica on-demand tramite `sync(node)`.
+
+```mermaid
+sequenceDiagram
+    actor U as Utente
+    participant L as Login / Shell
+    participant LS as LibraryService
+    participant IDB as IndexedDB
+    participant S as assets/snapshot-*.jsonl
+    participant D as DriveService (API v3)
+
+    U->>L: Login o Logout
+    L->>LS: verify() [timeout UI 15s]
+    LS->>IDB: loadCache() (tree, meta:*, lastCheck)
+    LS->>S: importSnapshot() (streaming NDJSON, skip se snapshotAt uguale)
+    S-->>IDB: setMany(html:*, meta:*, snapshotAt)
+    LS->>D: buildTree(driveRootId)
+    D-->>LS: TreeNode aggiornato (+ mergeGroups)
+    LS->>IDB: set('tree', tree) & del file rimossi
+    LS-->>L: Fase 1 completata (sblocca UI)
+    par Fase 2 (background, pool=2)
+        LS->>D: downloadBinary / downloadText per file stale
+        D-->>LS: ArrayBuffer / string
+        LS->>LS: mammoth.convertToHtml + enrichHtml()
+        LS->>IDB: set('html:id'), set('meta:id')
+        LS->>LS: MiniSearch addAll() + version++
+    end
+```
+
+---
+
+## `DriveService` (`src/app/drive.service.ts`)
+
+Incapsula tutte le chiamate HTTP verso `https://www.googleapis.com/drive/v3`.
+
+### Controllo concorrenza e retry
+- **`MAX_CONCURRENT = 2`**: semaforo interno (`slot()`) con coda FIFO (`waiting[]`) per evitare di saturare banda e quota Google.
+- **`RETRY_DELAYS = [1000, 2000, 4000, 8000, 16000]`** (backoff esponenziale fino a 5 retry, 31 s totali).
+- Condizioni ritentate:
+  - Errori di rete (`fetch` reject).
+  - HTTP `408`, `429`, `5xx`.
+  - HTTP `403` il cui body matcha `/rateLimit|quota/i`.
+- Errori `403`/`404` non rate-limit generano un messaggio diagnostico che invita a controllare la condivisione *"Chiunque abbia il link"* e la chiave API.
+
+### Costruzione dell'albero (`buildTree`)
+- Esegue `listChildren(folderId)` paginando con `pageSize=1000`, `q="'<id>' in parents and trashed = false"`, `supportsAllDrives=true`, `includeItemsFromAllDrives=true`.
+- Classifica i nodi (`kindOf`):
+  - `application/vnd.google-apps.folder` → `'folder'`
+  - `application/vnd.google-apps.document` → `'gdoc'`
+  - `application/vnd.openxmlformats-officedocument.wordprocessingml.document` o `.docx` → `'docx'`
+  - `text/*` o `.md`/`.txt` → `'text'`
+  - Tutto il resto → `'other'` (ignorato da indicizzazione e liste documenti)
+- Ripulisce i nomi con `displayName()` rimuovendo le estensioni (`.docx`, `.doc`, `.dotx`, `.odt`, `.rtf`, `.pdf`, `.md`, `.txt`, `.xlsx`, `.pptx`, `.gdoc`).
+- Applica **`mergeGroups(nodes)`**:
+  - Per ogni regola in `environment.mergeGroups`, cerca i file non-cartella nella stessa directory che soddisfano `pattern` (almeno 2 file), li ordina naturalmente (`localeCompare('en', { numeric: true })`) e li sostituisce con un nodo virtuale:
+    - `id`: `` `merge:${parts.map(p => p.id).join('+')}` ``
+    - `kind`: `'docx'`
+    - `modifiedTime`: concatenazione dei `modifiedTime` con `+`
+    - `size`: somma numerica delle dimensioni
+    - `parts`: array dei `TreeNode` originali
+- Ordina ogni cartella mettendo prima le sottocartelle e poi i file, in ordine naturale case-insensitive.
+
+### Download dei contenuti
+- **`downloadBinary(node)`**:
+  - Se `node.kind === 'gdoc'`: usa `/files/{id}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+  - Altrimenti: `/files/{id}?alt=media&supportsAllDrives=true`
+- **`downloadText(node)`**: `/files/{id}?alt=media&supportsAllDrives=true`
+
+---
+
+## `LibraryService` (`src/app/library.service.ts`)
+
+È il cuore dello stato dati dell'intera applicazione.
+
+### Signals pubblici
+
+| Signal | Tipo | Significato |
+|---|---|---|
+| `tree` | `TreeNode \| null` | Albero corrente della biblioteca |
+| `status` | `'idle' \| 'checking' \| 'syncing' \| 'error'` | Stato della sincronizzazione |
+| `statusText` | `string` | Messaggio testuale corrente |
+| `total` / `done` | `number` | Avanzamento download dei file stale |
+| `fatalError` | `string` | Errore bloccante di lettura Drive / API key mancante |
+| `docErrors` | `Record<string, string>` | Mappa `docId -> errore` per singoli file falliti |
+| `version` | `number` | Contatore incrementato a ogni modifica dell'indice (trigger per `computed()` di ricerca, glossario, spellbook, calcolatore) |
+| `lastCheck` | `Date \| null` | Timestamp ultima verifica conclusa |
+| `exporting` / `exportInfo` | `'idle' \| 'working' \| 'done' \| 'error'` / `string` | Stato dell'esportazione snapshot in Home |
+
+### Pipeline di conversione di un documento (`sync` / `doSync`)
+- Deduplica richieste concorrenti sullo stesso documento tramite la mappa `inflight`.
+- Supporta sia file singoli che documenti uniti (`node.parts ?? [node]`):
+  - Se unito, assegna prefissi di ancora `p0`, `p1`, … e antepone `<h1>Nome parte</h1>`; altrimenti prefisso `s`.
+  - Per `docx`/`gdoc`: converte l'`ArrayBuffer` con `mammoth.convertToHtml` usando `STYLE_MAP` (`Title => h1:fresh`, `Subtitle => h2:fresh`), poi passa l'HTML a `enrichHtml()` (vedi [[Parser, Formule Spell e Lookup]]).
+  - Per `text`: racchiude il testo escapato in `<pre class="plain">...</pre>` e crea una singola sezione `level: 1`.
+- Salva in IndexedDB:
+  - `html:<docId>` → stringa HTML arricchita
+  - `meta:<docId>` → oggetto `DocMeta` (con `parser: PARSER_VERSION` e `sections`)
+- Aggiorna l'indice `MiniSearch` (`addToIndex`), pulisce eventuali errori in `docErrors` e incrementa `version`.
+
+### Criterio di invalidazione (`isStale`)
+Un documento viene riscaricato se almeno una condizione è vera:
+1. Non esiste `DocMeta` in cache.
+2. `meta.modifiedTime !== (node.modifiedTime ?? '')`.
+3. `meta.name !== node.name`.
+4. `meta.parser !== PARSER_VERSION` (attualmente `2`).
+
+---
+
+## Sistema Snapshot precompilati (`.jsonl`)
+
+Per evitare che ogni nuovo dispositivo debba scaricare e convertire centinaia di `.docx` da Drive (alcuni > 5 MB), il progetto implementa un meccanismo di **import/export streaming in formato NDJSON (`.jsonl`)**.
+
+### Formato dei file `assets/snapshot-N.jsonl`
+- **Riga 1 (header)**:
+  - Nel file `snapshot-1.jsonl`: `{"generatedAt": "<ISO>", "tree": { ...TreeNode... }}`
+  - Nei file successivi (`snapshot-2..N.jsonl`): `{"generatedAt": "<ISO>"}`
+- **Righe successive**: un oggetto JSON per documento: `{"id": "...", "meta": { ...DocMeta... }, "html": "..."}`.
+
+### Import (`importSnapshot()`)
+- Itera da `part = 1` fino a `50` facendo `fetch('assets/snapshot-${part}.jsonl', { cache: 'no-cache' })` e si ferma al primo `404` / errore.
+- Legge lo stream riga per riga tramite `TextDecoderStream` (basso consumo RAM).
+- Confronta `h.generatedAt` del part 1 con la chiave IndexedDB `snapshotAt`: se coincide, cancella subito lo stream e salta l'import.
+- Scrive i documenti mancanti in batch da 200 entry (`setMany`), salvando quanto letto nel `finally` anche in caso di interruzione.
+
+### Export (`exportSnapshot()`)
+- Avviabile dalla Home (*Copia per il caricamento rapido*).
+- Spezza l'output in file da massimo **15.000.000 caratteri** (`LIMIT`, ben sotto il limite browser di 25 MB di GitHub).
+- Genera il download sequenziale di `snapshot-1.jsonl`, `snapshot-2.jsonl`, … con una pausa di `700 ms` tra un file e l'altro e `URL.revokeObjectURL` dopo 60 s.
+
+---
+
+## Indice `MiniSearch` e `linkTerms()`
+
+- **Configurazione `MiniSearch`**:
+  - `fields: ['heading', 'text']`
+  - `storeFields: ['docId', 'anchor', 'heading']`
+  - `searchOptions: { boost: { heading: 3 }, prefix: true }`
+  - Tokenizzazione Unicode (`[^\p{L}\p{N}’']+`), normalizzazione lowercase senza apostrofi.
+  - Ogni sezione è indicizzata come documento con chiave `${docId}#${sectionId}`.
+- **Glossario cliccabile (`linkTerms()`)**:
+  - Memoizzato rispetto a `this.version()`.
+  - Raccoglie tutte le sezioni con `level >= 3` e `heading.length >= 5` (fino a 80 caratteri), escludendo `GENERIC_HEADINGS` (18 titoli generici come `benefit`, `special`, `prerequisite`, `notes`, `example`, `table`, ecc.).
+  - Ordina i documenti mettendo **prima i documenti non-Bestiario e poi il Bestiario**, e dà precedenza ai nomi pieni (`full`) rispetto ai derivati (`derived`), passando poi tutto a `buildTermMap()` (vedi [[Parser, Formule Spell e Lookup]]).
