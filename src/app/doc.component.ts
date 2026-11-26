@@ -105,6 +105,7 @@ export class DocComponent {
   private destroyRef = inject(DestroyRef);
   private linkRun = 0;
   private linkFrame: number | null = null;
+  private linkObserver: IntersectionObserver | null = null;
 
   private id = toSignal(this.route.paramMap.pipe(map(p => p.get('id') ?? '')), {
     initialValue: '',
@@ -164,6 +165,10 @@ export class DocComponent {
       cancelAnimationFrame(this.linkFrame);
       this.linkFrame = null;
     }
+    if (this.linkObserver) {
+      this.linkObserver.disconnect();
+      this.linkObserver = null;
+    }
   }
 
   toggleToc(): void {
@@ -198,29 +203,30 @@ export class DocComponent {
 
   /**
    * Rende cliccabili i nomi di feat, talenti, spell e altre voci del Drive che compaiono nel testo
-   * (anche nel bestiario). Elabora a piccoli blocchi per frame così i documenti grandi non congelano la UI.
+   * (anche nel bestiario). Sui documenti lunghi collega solo i blocchi vicini alla viewport
+   * tramite IntersectionObserver, evitando migliaia di mutazioni DOM inutili fuori schermo.
    */
   private linkNames(run: number): void {
     const root = this.contentEl?.nativeElement;
     if (!root || run !== this.linkRun) return;
     const terms = this.library.linkTerms();
     if (!terms.map.size) return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: n => {
-        const p = n.parentElement;
-        if (!p || p.closest('h1, h2, h3, h4, h5, h6, a, button, .seed, .formula-detail')) return NodeFilter.FILTER_REJECT;
-        return (n.textContent ?? '').length > 2 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-      },
-    });
-    const nodes: Text[] = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-    let idx = 0;
-    const step = () => {
-      this.linkFrame = null;
-      if (run !== this.linkRun) return;
-      const deadline = performance.now() + 10;
-      while (idx < nodes.length && performance.now() < deadline) {
-        const node = nodes[idx++];
+
+    const linkSubtree = (el: HTMLElement) => {
+      if (!el.isConnected || el.dataset['linked']) return;
+      el.dataset['linked'] = '1';
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode: n => {
+          const p = n.parentElement;
+          if (!p || p.closest('h1, h2, h3, h4, h5, h6, a, button, .seed, .term-link, .formula-detail')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return (n.textContent ?? '').length > 2 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        },
+      });
+      const nodes: Text[] = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+      for (const node of nodes) {
         if (!node.isConnected) continue;
         const parts = splitTerms(node.textContent ?? '', terms);
         if (parts.length === 1 && !parts[0].ref) continue;
@@ -242,7 +248,42 @@ export class DocComponent {
         }
         node.replaceWith(frag);
       }
-      if (idx < nodes.length && run === this.linkRun) {
+    };
+
+    const blocks = (Array.from(root.children) as HTMLElement[]).filter(
+      el => !/^(H[1-6]|BUTTON|HR)$/.test(el.tagName) && !el.classList.contains('formula-detail')
+    );
+
+    if (blocks.length > 80 && typeof IntersectionObserver !== 'undefined') {
+      const obs = new IntersectionObserver(
+        entries => {
+          if (run !== this.linkRun) {
+            obs.disconnect();
+            return;
+          }
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const target = entry.target as HTMLElement;
+            obs.unobserve(target);
+            linkSubtree(target);
+          }
+        },
+        { rootMargin: '600px 0px' }
+      );
+      this.linkObserver = obs;
+      for (const b of blocks) obs.observe(b);
+      return;
+    }
+
+    let idx = 0;
+    const step = () => {
+      this.linkFrame = null;
+      if (run !== this.linkRun) return;
+      const deadline = performance.now() + 10;
+      while (idx < blocks.length && performance.now() < deadline) {
+        linkSubtree(blocks[idx++]);
+      }
+      if (idx < blocks.length && run === this.linkRun) {
         this.linkFrame = requestAnimationFrame(step);
       }
     };
