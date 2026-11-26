@@ -144,22 +144,22 @@ Un documento viene riscaricato se almeno una condizione è vera:
 
 Per evitare che ogni nuovo dispositivo debba scaricare e convertire centinaia di `.docx` da Drive (alcuni > 5 MB), il progetto implementa un meccanismo di **import/export streaming in formato NDJSON (`.jsonl`)**.
 
-### Formato dei file `assets/snapshot-N.jsonl`
+### Formato dei file `assets/snapshot-core-N.jsonl` e `assets/snapshot-bestiary-N.jsonl`
 - **Riga 1 (header)**:
-  - Nel file `snapshot-1.jsonl`: `{"generatedAt": "<ISO>", "tree": { ...TreeNode... }}`
-  - Nei file successivi (`snapshot-2..N.jsonl`): `{"generatedAt": "<ISO>"}`
+  - Nel file `snapshot-core-1.jsonl`: `{"generatedAt": "<ISO>", "tree": { ...TreeNode... }}`
+  - Nei file successivi (`snapshot-core-2..N.jsonl` e `snapshot-bestiary-1..N.jsonl`): `{"generatedAt": "<ISO>"}`
 - **Righe successive**: un oggetto JSON per documento: `{"id": "...", "meta": { ...DocMeta... }, "html": "..."}`.
 
-### Import (`importSnapshot()`)
-- Itera da `part = 1` fino a `50` facendo `fetch('assets/snapshot-${part}.jsonl', { cache: 'no-cache' })` e si ferma al primo `404` / errore.
-- Legge lo stream riga per riga tramite `TextDecoderStream` (basso consumo RAM).
-- Confronta `h.generatedAt` del part 1 con la chiave IndexedDB `snapshotAt`: se coincide, cancella subito lo stream e salta l'import.
-- Scrive i documenti mancanti in batch da 200 entry (`setMany`), salvando quanto letto nel `finally` anche in caso di interruzione.
+### Import in due fasi (`importSnapshot()`)
+- **Fase 1 (attesa al login):** carica `assets/snapshot-core-1..N.jsonl` (~15,2 MB totali), salva in IndexedDB (`snapshotCoreAt`), indicizza in `MiniSearch` e sblocca subito l'ingresso con tutte le regole, classi, feat e spell pronte.
+- **Fase 2 (in background):** avvia `startBestiaryImport()` su `assets/snapshot-bestiary-1..N.jsonl` (`snapshotBestiaryAt`), mostrando l'avanzamento in `bestiaryStatus` nella barra `.sync` e coordinandosi con `checkTree()` per evitare download duplicati dal Drive.
+- **Fallback legacy:** se `snapshot-core-1.jsonl` non esiste (404), ripiega automaticamente su `assets/snapshot-1..50.jsonl` (`snapshotAt`).
+- Legge lo stream riga per riga tramite `TextDecoderStream` (basso consumo RAM) e scrive i documenti mancanti in batch da 200 entry (`setMany`), salvando quanto letto nel `finally` anche in caso di interruzione.
 
 ### Export (`exportSnapshot()`)
 - Avviabile dalla Home (*Copia per il caricamento rapido*).
-- Spezza l'output in file da massimo **15.000.000 caratteri** (`LIMIT`, ben sotto il limite browser di 25 MB di GitHub).
-- Genera il download sequenziale di `snapshot-1.jsonl`, `snapshot-2.jsonl`, … con una pausa di `700 ms` tra un file e l'altro e `URL.revokeObjectURL` dopo 60 s.
+- Genera le due serie separate `snapshot-core-N.jsonl` e `snapshot-bestiary-N.jsonl` spezzate in blocchi da massimo **15.000.000 caratteri** (`LIMIT`, sotto il limite browser di 25 MB di GitHub).
+- Genera il download sequenziale con una pausa di `700 ms` tra un file e l'altro e `URL.revokeObjectURL` dopo 60 s.
 
 ---
 

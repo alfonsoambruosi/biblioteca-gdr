@@ -60,6 +60,7 @@ updated: 2026-11-26
 
 ### 05 — Analisi e Manutenzione
 - [[Sicurezza, Limiti e Debito Tecnico]] — Modello di sicurezza reale, bug/disallineamenti individuati nell'analisi del codice, debito tecnico e spunti evolutivi.
+- [[Registro Commit 2026-11-26]] — Diario dettagliato di tutti i commit svolti oggi su `SteBranch` (problema, modifica e beneficio di ciascun commit).
 
 ---
 

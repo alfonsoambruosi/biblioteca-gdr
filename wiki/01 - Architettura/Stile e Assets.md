@@ -95,13 +95,10 @@ Effetto vignettatura: `body::before` applica un `radial-gradient` fisso scuro ve
 - `sfondo-4.jpg` (0,43 MB)
 - `sfondo-5.jpg` (0,45 MB)
 
-### Snapshot precompilati (`src/assets/snapshot-1..12.jsonl`)
-12 file NDJSON generati il `2026-11-21T14:48:46.511Z`, per un totale di **~151,6 MB** e **636 documenti**:
-- `snapshot-1.jsonl` (13,37 MB) — contiene anche l'intero albero `tree`
-- `snapshot-2.jsonl` … `snapshot-9.jsonl` (~13,6–14,3 MB ciascuno)
-- `snapshot-10.jsonl` (9,82 MB)
-- `snapshot-11.jsonl` (12,94 MB)
-- `snapshot-12.jsonl` (2,08 MB)
+### Snapshot precompilati (`src/assets/snapshot-core-*.jsonl` e `snapshot-bestiary-*.jsonl`)
+10 file NDJSON (generati il `2026-11-21T14:48:46.511Z`, ricompressi in WebP `700 px` q=`65` con `loading="lazy"` sulle immagini), per un totale di **~121,3 MB** e **636 documenti**:
+- **Serie Core** (`snapshot-core-1..2.jsonl`, ~15,2 MB — 7 documenti di regole core + `tree` nel part 1): caricata subito al login.
+- **Serie Bestiario** (`snapshot-bestiary-1..8.jsonl`, ~106,1 MB — 629 schede mostro): caricata in streaming in background senza bloccare l'ingresso.
 
 > [!info] Stile dei termini auto-collegati
 > I termini collegati automaticamente nei testi (`<span class="term-link">`) usano `.term-link` in `src/styles.css` (colore `--wax`, grassetto `600`, sottolineatura puntinata e `cursor: pointer`).
