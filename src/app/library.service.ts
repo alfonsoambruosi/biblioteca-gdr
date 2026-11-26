@@ -51,6 +51,7 @@ export class LibraryService {
   readonly tree = signal<TreeNode | null>(null);
   readonly status = signal<'idle' | 'checking' | 'syncing' | 'error'>('idle');
   readonly statusText = signal('');
+  readonly bestiaryStatus = signal('');
   readonly total = signal(0);
   readonly done = signal(0);
   readonly fatalError = signal('');
@@ -138,6 +139,7 @@ export class LibraryService {
   }
 
   private downloading: Promise<void> | null = null;
+  private bestiaryImporting: Promise<void> | null = null;
 
   private loadCache(): Promise<void> {
     this.cachePromise ??= this.doLoadCache();
@@ -231,8 +233,23 @@ export class LibraryService {
     const present = new Set(files.map(f => f.id));
     for (const id of Array.from(this.metas.keys())) if (!present.has(id)) this.removeFromIndex(id);
 
-    const stale = files.filter(f => this.isStale(f));
     this.version.update(v => v + 1);
+    const pendingBestiary = this.bestiaryImporting;
+    if (pendingBestiary) {
+      // Prima aggiorna subito le regole core (se stale); poi, terminato l'import locale del Bestiario,
+      // scarica dal Drive solo le schede Bestiario eventualmente cambiate dopo lo snapshot.
+      const coreStale = files.filter(f => !this.isBestiary(f.id) && this.isStale(f));
+      void (async () => {
+        if (coreStale.length) await this.downloadStale(coreStale);
+        await pendingBestiary;
+        const bestiaryStale = this.files().filter(f => this.isBestiary(f.id) && this.isStale(f));
+        if (bestiaryStale.length) await this.downloadStale(bestiaryStale);
+        else await this.finishCheck();
+      })();
+      return;
+    }
+
+    const stale = files.filter(f => this.isStale(f));
     if (stale.length) {
       void this.downloadStale(stale);
     } else {
@@ -241,14 +258,42 @@ export class LibraryService {
   }
 
   /**
-   * Carica la copia precompilata: i file assets/snapshot-1.jsonl, snapshot-2.jsonl, ...
-   * (uno ogni circa 15 MB). In ogni file c'è una riga per documento; il primo contiene
-   * anche la data della copia e la struttura delle cartelle.
-   * Importa solo i documenti che il dispositivo non ha ancora: quelli cambiati
-   * vengono poi confrontati con il Drive e riscaricati solo se necessario.
+   * Carica la copia precompilata in due fasi:
+   * 1) `assets/snapshot-core-1..N.jsonl` (regole, classi, talenti, incantesimi): atteso al login (~1 file);
+   * 2) `assets/snapshot-bestiary-1..N.jsonl` (schede mostri): avviato in background senza bloccare l'ingresso.
+   * Se non esistono file `snapshot-core-*`, ripiega sul formato legacy `assets/snapshot-1..N.jsonl`.
    */
   private async importSnapshot(): Promise<void> {
-    const st = { generatedAt: '', skip: false };
+    const hasCore = await this.importSeries('snapshot-core', 'snapshotCoreAt');
+    if (hasCore) {
+      void this.startBestiaryImport();
+      return;
+    }
+    await this.importSeries('snapshot', 'snapshotAt');
+  }
+
+  private startBestiaryImport(): Promise<void> {
+    if (!this.bestiaryImporting) {
+      this.bestiaryImporting = this.importSeries(
+        'snapshot-bestiary',
+        'snapshotBestiaryAt',
+        part => this.bestiaryStatus.set(`Carico il Bestiario in background (parte ${part})…`)
+      )
+        .then(() => undefined)
+        .finally(() => {
+          this.bestiaryStatus.set('');
+          this.bestiaryImporting = null;
+        });
+    }
+    return this.bestiaryImporting;
+  }
+
+  private async importSeries(
+    prefix: string,
+    storageKey: string,
+    onPart?: (part: number) => void
+  ): Promise<boolean> {
+    const st = { generatedAt: '', skip: false, found: false };
     const pending: [string, unknown][] = [];
     const flush = async () => {
       if (pending.length) await setMany(pending.splice(0));
@@ -257,11 +302,12 @@ export class LibraryService {
     for (let part = 1; part <= 50 && !st.skip; part++) {
       let res: Response;
       try {
-        res = await fetch(`assets/snapshot-${part}.jsonl`, { cache: 'no-cache' });
+        res = await fetch(`assets/${prefix}-${part}.jsonl`, { cache: 'no-cache' });
       } catch {
         break;
       }
       if (!res.ok || !res.body) break; // nessun file con questo numero: fine
+      st.found = true;
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buf = '';
@@ -274,7 +320,7 @@ export class LibraryService {
           const h = obj as { generatedAt: string; tree?: TreeNode };
           st.generatedAt = h.generatedAt;
           if (part === 1) {
-            if ((await get<string>('snapshotAt')) === h.generatedAt) {
+            if ((await get<string>(storageKey)) === h.generatedAt) {
               st.skip = true; // questa copia è già stata caricata
               return;
             }
@@ -283,6 +329,7 @@ export class LibraryService {
               await set('tree', h.tree);
             }
           }
+          onPart?.(part);
           return;
         }
         const d = obj as { id: string; meta: DocMeta; html: string };
@@ -318,10 +365,11 @@ export class LibraryService {
     }
 
     if (st.generatedAt && !st.skip) {
-      await set('snapshotAt', st.generatedAt);
+      await set(storageKey, st.generatedAt);
       await this.flushSearchIndex();
       this.version.update(v => v + 1);
     }
+    return st.found;
   }
 
   /** Stato dell'esportazione, mostrato nella Home. */
@@ -329,57 +377,72 @@ export class LibraryService {
   readonly exportInfo = signal('');
 
   /**
-   * Crea i file snapshot-1.jsonl, snapshot-2.jsonl... con i documenti salvati su questo dispositivo.
+   * Crea i file divisi per priorità (`snapshot-core-N.jsonl` per le regole e
+   * `snapshot-bestiary-N.jsonl` per il Bestiario) con i documenti salvati su questo dispositivo.
    * Vanno copiati tutti in src/assets/ e pubblicati di nuovo.
    */
   async exportSnapshot(): Promise<void> {
     this.exporting.set('working');
-    this.exportInfo.set('Preparo il file…');
+    this.exportInfo.set('Preparo i file…');
     try {
       const tree = this.tree();
       if (!tree) throw new Error('la biblioteca non è ancora caricata.');
       const files = this.files();
       const LIMIT = 15_000_000; // caratteri: sotto i 25 MB che GitHub accetta dal browser
       const generatedAt = new Date().toISOString();
-      const blobs: Blob[] = [];
-      let current: string[] = [];
-      let size = 0;
-      const header = (n: number) =>
-        JSON.stringify(n === 1 ? { generatedAt, tree } : { generatedAt }) + '\n';
-      current.push(header(1));
-      size = current[0].length;
+      const coreFiles = files.filter(f => !this.isBestiary(f.id));
+      const bestiaryFiles = files.filter(f => this.isBestiary(f.id));
+      const downloads: { name: string; blob: Blob }[] = [];
       let exported = 0;
-      for (const f of files) {
-        const meta = this.metas.get(f.id);
-        const html = await get<string>(`html:${f.id}`);
-        if (!meta || html == null) continue;
-        const line = JSON.stringify({ id: f.id, meta, html }) + '\n';
-        if (size + line.length > LIMIT && current.length > 1) {
-          blobs.push(new Blob(current, { type: 'application/x-ndjson' }));
-          current = [header(blobs.length + 1)];
-          size = current[0].length;
+
+      const pack = async (list: TreeNode[], prefix: string, includeTree: boolean) => {
+        if (!list.length && !includeTree) return;
+        let part = 1;
+        const header = (n: number) =>
+          JSON.stringify(includeTree && n === 1 ? { generatedAt, tree } : { generatedAt }) + '\n';
+        let current: string[] = [header(1)];
+        let size = current[0].length;
+        let countInSeries = 0;
+        for (const f of list) {
+          const meta = this.metas.get(f.id);
+          const html = await get<string>(`html:${f.id}`);
+          if (!meta || html == null) continue;
+          const line = JSON.stringify({ id: f.id, meta, html }) + '\n';
+          if (size + line.length > LIMIT && current.length > 1) {
+            downloads.push({ name: `${prefix}-${part}.jsonl`, blob: new Blob(current, { type: 'application/x-ndjson' }) });
+            part++;
+            current = [header(part)];
+            size = current[0].length;
+          }
+          current.push(line);
+          size += line.length;
+          exported++;
+          countInSeries++;
         }
-        current.push(line);
-        size += line.length;
-        exported++;
-      }
-      blobs.push(new Blob(current, { type: 'application/x-ndjson' }));
+        if (countInSeries > 0 || includeTree) {
+          downloads.push({ name: `${prefix}-${part}.jsonl`, blob: new Blob(current, { type: 'application/x-ndjson' }) });
+        }
+      };
+
+      await pack(coreFiles, 'snapshot-core', true);
+      await pack(bestiaryFiles, 'snapshot-bestiary', false);
+
       const missing = files.length - exported;
-      for (const [i, blob] of blobs.entries()) {
-        const url = URL.createObjectURL(blob);
+      for (const item of downloads) {
+        const url = URL.createObjectURL(item.blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `snapshot-${i + 1}.jsonl`;
+        link.download = item.name;
         document.body.appendChild(link);
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         await new Promise(r => setTimeout(r, 700)); // lascia al browser il tempo di salvare ogni file
       }
-      const total = blobs.reduce((t, b) => t + b.size, 0);
+      const total = downloads.reduce((t, d) => t + d.blob.size, 0);
       this.exporting.set('done');
       this.exportInfo.set(
-        `Creati ${blobs.length} file con ${exported} documenti (${(total / 1e6).toFixed(1)} MB in totale). ` +
+        `Creati ${downloads.length} file con ${exported} documenti (${(total / 1e6).toFixed(1)} MB in totale). ` +
           (missing ? `${missing} documenti non sono ancora salvati e mancano nel file. ` : '') +
           'Carica tutti i file in src/assets/. Controlla la cartella Download del browser.'
       );

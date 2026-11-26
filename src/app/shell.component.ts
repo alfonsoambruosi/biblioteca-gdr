@@ -60,6 +60,8 @@ export class ShellComponent {
     if (s === 'error') return this.library.fatalError() || 'Errore di lettura del Drive: resta la copia salvata.';
     if (s === 'syncing') return `Aggiorno i documenti modificati… ${this.library.done()} / ${this.library.total()}`;
     if (s === 'checking') return 'Controllo il Drive…';
+    const bestiary = this.library.bestiaryStatus();
+    if (bestiary) return bestiary;
     const errors = Object.keys(this.library.docErrors()).length;
     const last = this.library.lastCheck();
     const when = last
