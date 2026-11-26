@@ -179,25 +179,30 @@ function blockText(el: HTMLElement): string {
   return (el.textContent ?? '').trim();
 }
 
-/** Estrae da un documento il blocco che inizia con l'elemento `anchor`. */
-export function sliceSection(html: string, anchor: string): string {
-  const dom = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+/** Estrae da un Document già parsato il blocco che inizia con l'elemento `anchor`. */
+export function sliceSectionFromDoc(dom: Document, anchor: string): string {
   const start = dom.getElementById(anchor);
   if (!start) return '';
   const level = +(/^H([1-6])$/.exec(start.tagName)?.[1] ?? 0);
-  const out: string[] = [start.outerHTML];
+  const wrap = dom.createElement('div');
+  wrap.appendChild(start.cloneNode(true));
   // una voce-formula è un solo paragrafo; un titolo arriva fino al titolo successivo
   let el = level ? (start.nextElementSibling as HTMLElement | null) : null;
   while (el) {
     const m = /^H([1-6])$/.exec(el.tagName);
     if (m && +m[1] <= level) break;
-    out.push(el.outerHTML);
+    wrap.appendChild(el.cloneNode(true));
     el = el.nextElementSibling as HTMLElement | null;
   }
-  const wrap = new DOMParser().parseFromString(`<body>${out.join('')}</body>`, 'text/html');
-  wrap.body.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
-  wrap.body.querySelectorAll('.expand-formula, .formula-detail').forEach(e => e.remove());
-  return wrap.body.innerHTML;
+  wrap.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+  wrap.querySelectorAll('.expand-formula, .formula-detail').forEach(e => e.remove());
+  return wrap.innerHTML;
+}
+
+/** Estrae da un documento il blocco che inizia con l'elemento `anchor`. */
+export function sliceSection(html: string, anchor: string): string {
+  const dom = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  return sliceSectionFromDoc(dom, anchor);
 }
 
 /** Normalizza il titolo di una voce per il confronto (rimuove [tag], codici fonte, ecc.). */

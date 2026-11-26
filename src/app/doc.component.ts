@@ -261,12 +261,13 @@ export class DocComponent {
       }
       btn.textContent = 'Caricamento…';
       const terms = (btn.dataset['terms'] ?? '').split('|').filter(Boolean);
-      const blocks: string[] = [];
-      for (const t of terms) {
-        const m = /^\*(\d)\*(.+)$/.exec(t); // spell base di livello 0-9
-        const term = m ? m[2] : t;
-        blocks.push(`<h6 class="term">${esc(term)}</h6>${await this.describe(term, m?.[1])}`);
-      }
+      const blocks = await Promise.all(
+        terms.map(async t => {
+          const m = /^\*(\d)\*(.+)$/.exec(t); // spell base di livello 0-9
+          const term = m ? m[2] : t;
+          return `<h6 class="term">${esc(term)}</h6>${await this.describe(term, m?.[1])}`;
+        })
+      );
       box.innerHTML = blocks.join('');
       box.hidden = false;
       btn.textContent = 'Nascondi le descrizioni';

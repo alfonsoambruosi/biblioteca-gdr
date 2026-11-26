@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { LibraryService } from './library.service';
-import { esc, normTerm, sliceSection, tokenKey } from './doc-parser';
+import { esc, normTerm, sliceSectionFromDoc, tokenKey } from './doc-parser';
 import { environment } from '../environments/environment';
 import { TreeNode } from './models';
+
+const DOM_CACHE_MAX = 6;
 
 export interface EntryRef {
   docId: string;
@@ -37,6 +39,8 @@ export class LookupService {
     byToken: Map<string, EntryRef[]>;
   } | null = null;
   private spellBookCache: { v: number; book: Map<string, Map<number, SpellRef[]>> } | null = null;
+  private domCache = new Map<string, { stamp: string; doc: Document }>();
+  private domInflight = new Map<string, Promise<Document>>();
 
   /** Numero di documenti leggibili contenuti in un nodo (ricorsivo). */
   countFiles(n: TreeNode): number {
@@ -100,10 +104,39 @@ export class LookupService {
     return out.sort((a, b) => a.level - b.level); // prima le voci vere, poi le righe-formula
   }
 
+  private async parsedDoc(docId: string): Promise<Document> {
+    const m = this.library.meta(docId);
+    const stamp = m ? `${m.modifiedTime}:${m.parser ?? 0}` : '';
+    const cached = this.domCache.get(docId);
+    if (cached && stamp && cached.stamp === stamp) {
+      // LRU: sposta in fondo come usato più di recente
+      this.domCache.delete(docId);
+      this.domCache.set(docId, cached);
+      return cached.doc;
+    }
+    const inflight = this.domInflight.get(docId);
+    if (inflight) return inflight;
+    const p = (async () => {
+      const html = await this.library.getHtml(docId);
+      const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+      const latest = this.library.meta(docId);
+      const latestStamp = latest ? `${latest.modifiedTime}:${latest.parser ?? 0}` : stamp;
+      this.domCache.delete(docId);
+      this.domCache.set(docId, { stamp: latestStamp, doc });
+      while (this.domCache.size > DOM_CACHE_MAX) {
+        const oldest = this.domCache.keys().next().value;
+        if (oldest !== undefined) this.domCache.delete(oldest);
+      }
+      return doc;
+    })().finally(() => this.domInflight.delete(docId));
+    this.domInflight.set(docId, p);
+    return p;
+  }
+
   /** HTML integrale di una voce (titolo + tutto il testo fino alla voce successiva). */
   async entryHtml(ref: EntryRef): Promise<string> {
-    const html = await this.library.getHtml(ref.docId);
-    return sliceSection(html, ref.anchor);
+    const doc = await this.parsedDoc(ref.docId);
+    return sliceSectionFromDoc(doc, ref.anchor);
   }
 
   /** Documenti degli incantesimi (Ch 8 / Ch 8a, anche uniti): il nome corrisponde alle regole di unione. */
@@ -172,11 +205,12 @@ export class LookupService {
   }
 
   private async render(refs: EntryRef[]): Promise<string> {
-    const parts: string[] = [];
-    for (const r of refs) {
-      const path = this.library.pathText(r.docId);
-      parts.push(`<div class="entry-src">${esc(path ? path + ' › ' : '')}${esc(r.docName)}</div>${await this.entryHtml(r)}`);
-    }
+    const parts = await Promise.all(
+      refs.map(async r => {
+        const path = this.library.pathText(r.docId);
+        return `<div class="entry-src">${esc(path ? path + ' › ' : '')}${esc(r.docName)}</div>${await this.entryHtml(r)}`;
+      })
+    );
     return parts.join('<hr>');
   }
 
