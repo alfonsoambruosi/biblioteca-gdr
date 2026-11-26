@@ -293,30 +293,43 @@ export class LibraryService {
     storageKey: string,
     onPart?: (part: number) => void
   ): Promise<boolean> {
-    const st = { generatedAt: '', skip: false, found: false };
+    const st = { generatedAt: '', skip: false, stop: false, found: false };
     const pending: [string, unknown][] = [];
     const flush = async () => {
       if (pending.length) await setMany(pending.splice(0));
     };
 
-    for (let part = 1; part <= 50 && !st.skip; part++) {
+    for (let part = 1; part <= 50 && !st.skip && !st.stop; part++) {
       let res: Response;
       try {
         res = await fetch(`assets/${prefix}-${part}.jsonl`, { cache: 'no-cache' });
       } catch {
         break;
       }
-      if (!res.ok || !res.body) break; // nessun file con questo numero: fine
-      st.found = true;
+      const ct = res.headers.get('content-type') ?? '';
+      // Dev server e hosting SPA possono rispondere 200 text/html (index.html) per file inesistenti.
+      if (!res.ok || !res.body || /\btext\/html\b/i.test(ct)) break;
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buf = '';
       let first = true;
       const handle = async (line: string) => {
-        if (!line.trim() || st.skip) return;
-        const obj = JSON.parse(line);
+        if (!line.trim() || st.skip || st.stop) return;
+        let obj: any;
+        try {
+          obj = JSON.parse(line);
+        } catch {
+          // Risposta non-JSON (es. fallback HTML senza header text/html): fine serie.
+          if (first) st.stop = true;
+          return;
+        }
         if (first) {
           first = false;
+          if (!obj || typeof obj !== 'object' || typeof obj.generatedAt !== 'string') {
+            st.stop = true;
+            return;
+          }
+          st.found = true;
           const h = obj as { generatedAt: string; tree?: TreeNode };
           st.generatedAt = h.generatedAt;
           if (part === 1) {
@@ -350,15 +363,15 @@ export class LibraryService {
             const line = buf.slice(0, nl);
             buf = buf.slice(nl + 1);
             await handle(line);
-            if (st.skip) break;
+            if (st.skip || st.stop) break;
             nl = buf.indexOf('\n');
           }
-          if (st.skip) {
+          if (st.skip || st.stop) {
             await reader.cancel();
             break;
           }
         }
-        if (!st.skip && buf.trim()) await handle(buf);
+        if (!st.skip && !st.stop && buf.trim()) await handle(buf);
       } finally {
         await flush(); // salva quanto letto, anche se il file si interrompe
       }
