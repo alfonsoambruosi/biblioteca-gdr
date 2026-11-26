@@ -111,6 +111,8 @@ export class DocComponent {
   private sanitizer = inject(DomSanitizer);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
+  private loadRun = 0;
+  private panelRun = 0;
   private linkRun = 0;
   private linkFrame: number | null = null;
   private linkObserver: IntersectionObserver | null = null;
@@ -154,7 +156,11 @@ export class DocComponent {
   private drag: { y: number; h: number } | null = null;
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.cancelLinkNames());
+    this.destroyRef.onDestroy(() => {
+      this.loadRun++;
+      this.panelRun++;
+      this.cancelLinkNames();
+    });
     // Ricarica quando cambia il documento o quando il Drive viene riletto.
     effect(() => {
       const id = this.id();
@@ -163,7 +169,11 @@ export class DocComponent {
         if (this.library.node(id)) {
           void this.load(id);
         } else if (this.library.tree()) {
+          this.loadRun++;
+          this.panelRun++;
           this.cancelLinkNames();
+          this.loading.set(false);
+          this.panel.set(null);
           this.error.set('Documento non trovato nel Drive.');
           this.html.set('');
         }
@@ -189,27 +199,31 @@ export class DocComponent {
   }
 
   private async load(id: string): Promise<void> {
+    const run = ++this.loadRun;
+    this.panelRun++;
     this.cancelLinkNames();
     this.loading.set(true);
     this.error.set('');
     this.panel.set(null);
     try {
       const raw = await this.library.getHtml(id);
+      if (run !== this.loadRun) return;
       // Assicura loading="lazy" e decoding="async" sulle immagini anche per i documenti già negli snapshot.
       const optimized = raw.replace(/<img(?=\s(?![^>]*\bloading=))/gi, '<img loading="lazy" decoding="async"');
       // Il contenuto arriva dai tuoi documenti: viene mostrato senza filtri,
       // così restano intatti gli ID, le tabelle e i collegamenti delle formule.
       this.html.set(this.sanitizer.bypassSecurityTrustHtml(optimized));
-      const run = this.linkRun;
+      const linkRun = this.linkRun;
       setTimeout(() => {
-        if (run === this.linkRun) this.linkNames(run);
+        if (run === this.loadRun && linkRun === this.linkRun) this.linkNames(linkRun);
       }); // dopo che Angular ha inserito il testo
-      this.scrollToFragment();
+      this.scrollToFragment(run);
     } catch (e: any) {
+      if (run !== this.loadRun) return;
       this.error.set(e?.message ?? String(e));
       this.html.set('');
     } finally {
-      this.loading.set(false);
+      if (run === this.loadRun) this.loading.set(false);
     }
   }
 
@@ -302,10 +316,12 @@ export class DocComponent {
     step();
   }
 
-  private scrollToFragment(): void {
+  private scrollToFragment(run: number): void {
     const frag = this.route.snapshot.fragment;
     if (!frag) return;
-    setTimeout(() => document.getElementById(frag)?.scrollIntoView({ block: 'start' }));
+    setTimeout(() => {
+      if (run === this.loadRun) document.getElementById(frag)?.scrollIntoView({ block: 'start' });
+    });
   }
 
   async onClick(ev: Event): Promise<void> {
@@ -338,24 +354,35 @@ export class DocComponent {
     const btn = t.closest('button.expand-formula') as HTMLButtonElement | null;
     if (btn) {
       const box = btn.nextElementSibling as HTMLElement | null;
-      if (!box || !box.classList.contains('formula-detail')) return;
+      if (!box || !box.classList.contains('formula-detail') || btn.disabled) return;
       if (!box.hidden) {
         box.hidden = true;
         btn.textContent = 'Mostra la descrizione di ogni componente';
         return;
       }
+      const run = this.loadRun;
+      btn.disabled = true;
       btn.textContent = 'Caricamento…';
-      const terms = (btn.dataset['terms'] ?? '').split('|').filter(Boolean);
-      const blocks = await Promise.all(
-        terms.map(async t => {
-          const m = /^\*(\d)\*(.+)$/.exec(t); // spell base di livello 0-9
-          const term = m ? m[2] : t;
-          return `<h6 class="term">${esc(term)}</h6>${await this.describe(term, m?.[1])}`;
-        })
-      );
-      box.innerHTML = blocks.join('');
-      box.hidden = false;
-      btn.textContent = 'Nascondi le descrizioni';
+      try {
+        const terms = (btn.dataset['terms'] ?? '').split('|').filter(Boolean);
+        const blocks = await Promise.all(
+          terms.map(async t => {
+            const m = /^\*(\d)\*(.+)$/.exec(t); // spell base di livello 0-9
+            const term = m ? m[2] : t;
+            return `<h6 class="term">${esc(term)}</h6>${await this.describe(term, m?.[1])}`;
+          })
+        );
+        if (run !== this.loadRun || !box.isConnected) return;
+        box.innerHTML = blocks.join('');
+        box.hidden = false;
+        btn.textContent = 'Nascondi le descrizioni';
+      } catch {
+        if (run === this.loadRun && btn.isConnected) {
+          btn.textContent = 'Mostra la descrizione di ogni componente';
+        }
+      } finally {
+        if (btn.isConnected) btn.disabled = false;
+      }
     }
   }
 
@@ -364,18 +391,32 @@ export class DocComponent {
   }
 
   private async openEntry(ref: EntryRef): Promise<void> {
+    const run = ++this.panelRun;
     this.panelTitle.set(ref.heading);
     this.panel.set(this.sanitizer.bypassSecurityTrustHtml('<p class="muted">Caricamento…</p>'));
-    const html = await this.lookup.entryHtml(ref);
-    this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html || '<p class="muted">Voce non trovata.</p>'));
+    try {
+      const html = await this.lookup.entryHtml(ref);
+      if (run !== this.panelRun) return;
+      this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html || '<p class="muted">Voce non trovata.</p>'));
+    } catch {
+      if (run !== this.panelRun) return;
+      this.panel.set(this.sanitizer.bypassSecurityTrustHtml('<p class="muted">Errore nel caricamento della voce.</p>'));
+    }
   }
 
   private async openTerm(term: string, base?: string): Promise<void> {
     if (!term) return;
+    const run = ++this.panelRun;
     this.panelTitle.set(term);
     this.panel.set(this.sanitizer.bypassSecurityTrustHtml('<p class="muted">Caricamento…</p>'));
-    const html = await this.describe(term, base);
-    this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html));
+    try {
+      const html = await this.describe(term, base);
+      if (run !== this.panelRun) return;
+      this.panel.set(this.sanitizer.bypassSecurityTrustHtml(html));
+    } catch {
+      if (run !== this.panelRun) return;
+      this.panel.set(this.sanitizer.bypassSecurityTrustHtml('<p class="muted">Errore nel caricamento della voce.</p>'));
+    }
   }
 
   /** Porta al titolo scelto nell'indice (su telefono chiude il pannello laterale). */
@@ -385,6 +426,7 @@ export class DocComponent {
   }
 
   closePanel(): void {
+    this.panelRun++;
     this.panel.set(null);
   }
 
