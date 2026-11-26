@@ -42,6 +42,10 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
 | 13 | `139951d` | Perf (Tier 3) | Compressione automatica WebP (max 700px, q=65) nelle conversioni `mammoth` | Pushato |
 | 14 | `c9dc356` | Perf (Tier 3) | Caricamento ed export snapshot divisi: `snapshot-core-*` subito + `snapshot-bestiary-*` in background | Pushato |
 | 15 | `7b6f3b1` | Perf (Tier 3) | Ricompressione immagini snapshot (WebP 700px q65) e split in `snapshot-core-1..2` + `snapshot-bestiary-1..8` | Pushato |
+| 16 | `7ae8c05` | Docs | Aggiunto registro commit giornaliero e aggiornata la wiki Obsidian | Pushato |
+| 17 | `63faf28` | Fix (QA) | Gestito fallback `200 text/html` in `importSeries()`, `try/finally` su login e titoli rotte | Pushato |
+| 18 | `1805187` | Perf (QA) | `IntersectionObserver` per `linkNames()` su documenti lunghi + `content-visibility: auto` su `.content > p` | Pushato |
+| 19 | `cf8e3ec` | Feature | Aggiunta voce metamagica editoriale `Effect-Specific Spell [Metamagic]` con esempi e Editor's Note | Pushato |
 
 ### Risultato misurato complessivo (Tier 1 + Tier 2 + Tier 3)
 
@@ -232,6 +236,40 @@ Torna a [[00 - Indice (MOC)]] · Correlati: [[Sicurezza, Limiti e Debito Tecnico
     - **Core (7 doc):** `snapshot-core-1.jsonl` (14,30 MB) + `snapshot-core-2.jsonl` (0,90 MB) = **15,20 MB**
     - **Bestiario (629 doc):** `snapshot-bestiary-1..8.jsonl` = **106,13 MB**
 - **Beneficio:** Peso totale ridotto da **158,96 MB → 121,33 MB (-23,7%)** e dati bloccanti al primo login ridotti del **90,4%** (da 158,96 MB a 15,20 MB).
+
+---
+
+### 16. `7ae8c05` — Aggiornamento wiki Obsidian e registro commit
+- **Messaggio:** `Docs: add daily commit log and update Obsidian wiki for Tier 1-3 optimizations`
+- **File modificati:** `wiki/00 - Indice (MOC).md`, `wiki/01 - Architettura/Flusso Dati e Cache.md`, `wiki/01 - Architettura/Stile e Assets.md`, `wiki/05 - Analisi e Manutenzione/Registro Commit 2026-11-26.md`
+- **Modifica:** Creato il diario tecnico dei commit del 26/11 e aggiornate le note su cache, snapshot divisi e dimensioni asset.
+
+---
+
+### 17. `63faf28` — Fix fallback HTML negli snapshot, `try/finally` al login e titoli rotte (trovato dal QA locale)
+- **Messaggio:** `Fix: handle SPA HTML fallback in snapshot import, guard login busy state, and set route titles`
+- **File modificati:** `src/app/library.service.ts`, `src/app/login.component.ts`, `src/app/app.routes.ts` (`+36 / -20`)
+- **Problema:** Durante il test E2E su `http://localhost:4200/`, la richiesta alla partizione successiva inesistente (`snapshot-core-3.jsonl`) riceveva dal dev server SPA `HTTP 200 text/html` (`index.html`) invece di `404`, causando `SyntaxError` in `JSON.parse`, bloccando il login su *"Attendere…"* e impedendo l'avvio del Bestiario in background. Inoltre `document.title` restava fermo su *"Accesso · Biblioteca GDR"*.
+- **Modifica:** Controllo esplicito `content-type` (`text/html` → fine serie) + `try/catch` su `JSON.parse` in `importSeries()`, `try/finally` su `LoginComponent.submit()` e `title` configurato su tutte le rotte in `app.routes.ts`.
+- **Beneficio:** Login, import `snapshot-core-*` e import in background `snapshot-bestiary-*` completano senza alcun errore anche su dev server e hosting SPA con fallback HTML.
+
+---
+
+### 18. `1805187` — `IntersectionObserver` per `linkNames()` e `content-visibility` su paragrafi (trovato dal QA locale)
+- **Messaggio:** `Perf: use IntersectionObserver for term-links and content-visibility on long documents`
+- **File modificati:** `src/app/doc.component.ts`, `src/styles.css` (`+60 / -18`)
+- **Problema:** Su `Ch 8 + 8a - Spells e Spells Grimoire` (5,6 MB), `linkNames()` creava subito 5.215 `.term-link` in tutto il documento anche fuori schermo.
+- **Modifica:** Sui documenti con > 80 blocchi, `linkNames()` usa `IntersectionObserver` (`rootMargin: '600px 0px'`) collegando solo i blocchi visibili (ridotti da **5.215 → 63** all'apertura di `Ch 8 + 8a`), più `content-visibility: auto` su `.content > p, ul, ol`.
+- **Beneficio:** Taglio del 98,8% delle mutazioni DOM all'apertura di `Ch 8 + 8a`.
+
+---
+
+### 19. `cf8e3ec` — Voce metamagica editoriale `Effect-Specific Spell [Metamagic]`
+- **Messaggio:** `Add custom metamagic entry for Effect-Specific Spell with examples and editor note`
+- **File modificati:** `src/app/custom-entries.ts` (nuovo), `src/app/lookup.service.ts`, `src/app/library.service.ts`, `src/app/item-calc.component.ts` (`+117`)
+- **Problema:** `Effect-Specific Spell` compare in decine di formule di `Ch 8 + 8a` ma non ha una sezione propria nei documenti del Drive, quindi cliccandoci non compariva alcuna descrizione dedicata.
+- **Modifica:** Creato il registro estensibile `src/app/custom-entries.ts` (indipendente dal Drive e dagli snapshot, così non viene mai sovrascritto) con `Effect-Specific Spell [Metamagic]` nello stile di `Creature-Specific Spell` (`Prerequisite`, `Benefit` con esempi reali da *Illusory Wall*, *Divine Favor* e *Zone of Truth*, `Metamagic Cost: -1 to -2 levels`, `Special` ed *Editor's Note* in inglese). Integrato in `LookupService`, `LibraryService` (auto-linking, ricerca globale e documento virtuale `site:custom-metamagic`) e nel calcolatore `/oggetti` (Metamagia con `-2 livelli`).
+- **Beneficio:** Cliccando `Effect-Specific Spell` in qualsiasi formula, testo, ricerca o calcolatore compare subito la sua scheda completa.
 
 ---
 
