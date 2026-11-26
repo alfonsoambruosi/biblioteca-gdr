@@ -24,13 +24,31 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
+          cache: npm
 
       - name: Inserisci la chiave API dal segreto del repository
-        run: sed -i "s|INSERISCI_QUI_LA_TUA_API_KEY|${{ secrets.DRIVE_API_KEY }}|" src/environments/environment.ts
+        env:
+          DRIVE_API_KEY: ${{ secrets.DRIVE_API_KEY }}
+        run: |
+          if [ -z "$DRIVE_API_KEY" ]; then
+            echo "::error::Il segreto DRIVE_API_KEY è vuoto o non configurato nel repository."
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const file = "src/environments/environment.ts";
+            const src = fs.readFileSync(file, "utf8");
+            const placeholder = "INSERISCI_QUI_LA_TUA_API_KEY";
+            if (!src.includes(placeholder)) {
+              console.error("::error::Segnaposto API key non trovato in " + file);
+              process.exit(1);
+            }
+            fs.writeFileSync(file, src.replace(placeholder, () => process.env.DRIVE_API_KEY));
+          '
 
       - name: Installa le dipendenze
-        run: npm install
+        run: npm ci
 
       - name: Compila l'app
         run: npm run build
