@@ -31,24 +31,70 @@ export function isDocNode(n: TreeNode): boolean {
 export class LookupService {
   private library = inject(LibraryService);
 
+  private entryIndexCache: {
+    v: number;
+    byNorm: Map<string, EntryRef[]>;
+    byToken: Map<string, EntryRef[]>;
+  } | null = null;
+  private spellBookCache: { v: number; book: Map<string, Map<number, SpellRef[]>> } | null = null;
+
   /** Numero di documenti leggibili contenuti in un nodo (ricorsivo). */
   countFiles(n: TreeNode): number {
     if (n.kind !== 'folder') return isDocNode(n) ? 1 : 0;
     return (n.children ?? []).reduce((a, c) => a + this.countFiles(c), 0);
   }
 
-  /** Sezioni il cui titolo coincide con il termine, es. "Jet of flame" o "Reach Spell". */
-  findEntries(term: string): EntryRef[] {
-    const exact = normTerm(term);
-    const key = tokenKey(term);
-    if (!exact) return [];
-    const out: EntryRef[] = [];
+  /** Indice O(1) delle sezioni per titolo normalizzato e per tokenKey, ricostruito solo quando cambia l'indice. */
+  private entryIndex() {
+    const v = this.library.version();
+    if (this.entryIndexCache && this.entryIndexCache.v === v) return this.entryIndexCache;
+    const byNorm = new Map<string, EntryRef[]>();
+    const byToken = new Map<string, EntryRef[]>();
+    const push = (map: Map<string, EntryRef[]>, key: string, ref: EntryRef) => {
+      if (!key) return;
+      let list = map.get(key);
+      if (!list) {
+        list = [];
+        map.set(key, list);
+      }
+      list.push(ref);
+    };
     for (const m of this.library.allMetas()) {
       for (const s of m.sections) {
         if (!s.heading) continue;
-        if (normTerm(s.heading) === exact || tokenKey(s.heading) === key) {
-          out.push({ docId: m.id, docName: m.name, anchor: s.id, heading: s.heading, level: s.level });
-        }
+        const ref: EntryRef = { docId: m.id, docName: m.name, anchor: s.id, heading: s.heading, level: s.level };
+        push(byNorm, normTerm(s.heading), ref);
+        push(byToken, tokenKey(s.heading), ref);
+      }
+    }
+    for (const list of byNorm.values()) list.sort((a, b) => a.level - b.level);
+    for (const list of byToken.values()) list.sort((a, b) => a.level - b.level);
+    this.entryIndexCache = { v, byNorm, byToken };
+    return this.entryIndexCache;
+  }
+
+  /** Sezioni il cui titolo coincide con il termine, es. "Jet of flame" o "Reach Spell". */
+  findEntries(term: string): EntryRef[] {
+    const exact = normTerm(term);
+    if (!exact) return [];
+    const key = tokenKey(term);
+    const { byNorm, byToken } = this.entryIndex();
+    const normHits = byNorm.get(exact);
+    const tokenHits = byToken.get(key);
+    if (!normHits && !tokenHits) return [];
+    if (!tokenHits) return [...normHits!];
+    if (!normHits) return [...tokenHits];
+    const seen = new Set<string>();
+    const out: EntryRef[] = [];
+    for (const r of normHits) {
+      seen.add(`${r.docId}#${r.anchor}`);
+      out.push(r);
+    }
+    for (const r of tokenHits) {
+      const k = `${r.docId}#${r.anchor}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push(r);
       }
     }
     return out.sort((a, b) => a.level - b.level); // prima le voci vere, poi le righe-formula
@@ -139,6 +185,8 @@ export class LookupService {
    * "Level arcane 1, divine 1" di ogni voce di spell. Non modifica nessun testo.
    */
   spellBook(): Map<string, Map<number, SpellRef[]>> {
+    const v = this.library.version();
+    if (this.spellBookCache && this.spellBookCache.v === v) return this.spellBookCache.book;
     const book = new Map<string, Map<number, SpellRef[]>>();
     for (const m of this.library.allMetas()) {
       for (const s of m.sections) {
@@ -157,6 +205,7 @@ export class LookupService {
         }
       }
     }
+    this.spellBookCache = { v, book };
     return book;
   }
 }
