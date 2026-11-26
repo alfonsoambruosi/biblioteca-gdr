@@ -238,7 +238,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
               max="12"
               aria-label="Numero giocatori"
               [value]="players()"
-              (input)="setPlayers(+$any($event.target).value)"
+              (change)="setPlayers($any($event.target))"
             />
           </label>
 
@@ -251,7 +251,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
               max="20"
               aria-label="Livello medio gruppo"
               [value]="partyLevel()"
-              (input)="setPartyLevel(+$any($event.target).value)"
+              (change)="setPartyLevel($any($event.target))"
             />
           </label>
 
@@ -622,14 +622,20 @@ export class BestiaryComponent {
     return 'in linea col budget';
   });
 
-  setPlayers(n: number): void {
-    if (!Number.isFinite(n)) return;
-    this.players.set(Math.max(1, Math.min(12, Math.round(n))));
+  setPlayers(el: HTMLInputElement): void {
+    const raw = el.value.trim();
+    const n = Number(raw);
+    const clamped = raw && Number.isFinite(n) ? Math.max(1, Math.min(12, Math.round(n))) : this.players();
+    el.value = String(clamped);
+    this.players.set(clamped);
   }
 
-  setPartyLevel(n: number): void {
-    if (!Number.isFinite(n)) return;
-    this.partyLevel.set(Math.max(1, Math.min(20, Math.round(n))));
+  setPartyLevel(el: HTMLInputElement): void {
+    const raw = el.value.trim();
+    const n = Number(raw);
+    const clamped = raw && Number.isFinite(n) ? Math.max(1, Math.min(20, Math.round(n))) : this.partyLevel();
+    el.value = String(clamped);
+    this.partyLevel.set(clamped);
   }
 
   setEncCategory(v: string): void {

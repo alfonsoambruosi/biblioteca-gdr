@@ -32,7 +32,7 @@ export class AuthService {
   constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', ev => {
-        if (ev.key === SESSION_KEY) this.loggedIn.set(ev.newValue === 'ok');
+        if (ev.key === SESSION_KEY || ev.key === null) this.loggedIn.set(ev.newValue === 'ok');
       });
     }
   }
