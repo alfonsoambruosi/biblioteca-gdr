@@ -157,7 +157,7 @@ function tryGroup(cands: Candidate[], budget: number): EncounterSlot[] | null {
     if (first) {
       const rem = budget - first.xp;
       const secondPool = cands.filter(
-        c => c.entry.docId !== first.entry.docId && c.xp >= rem * 0.25 && c.xp <= rem * 1.25
+        c => c.entry.id !== first.entry.id && c.xp >= rem * 0.25 && c.xp <= rem * 1.25
       );
       const second = pickRandom(secondPool);
       if (second) {
@@ -196,7 +196,7 @@ function tryBossMinions(cands: Candidate[], budget: number): EncounterSlot[] | n
   for (const count of minionCounts) {
     const target = rem / count;
     const mPool = cands.filter(
-      c => c.entry.docId !== boss.entry.docId && c.xp < boss.xp && c.xp >= target * 0.55 && c.xp <= target * 1.4
+      c => c.entry.id !== boss.entry.id && c.xp < boss.xp && c.xp >= target * 0.55 && c.xp <= target * 1.4
     );
     const minion = pickRandom(mPool);
     if (minion) return [makeSlot(boss, 1), makeSlot(minion, count)];
@@ -248,9 +248,9 @@ export function generateEncounter(
 export function rerollSlot(
   entries: BestiaryEntry[],
   current: EncounterSlot,
-  excludeDocIds: Set<string>
+  excludeIds: Set<string>
 ): EncounterSlot | null {
-  const cands = buildCandidates(entries).filter(c => !excludeDocIds.has(c.entry.docId));
+  const cands = buildCandidates(entries).filter(c => !excludeIds.has(c.entry.id));
   if (!cands.length) return null;
   const sameCr = cands.filter(c => Math.abs(c.cr - current.cr) < 0.01);
   const nearCr = sameCr.length

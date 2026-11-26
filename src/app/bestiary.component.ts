@@ -9,7 +9,7 @@ import {
   BESTIARY_SIZES,
   BestiaryEntry,
   CR_OPTIONS,
-  extractBestiaryEntry,
+  extractBestiaryEntries,
 } from './bestiary-index';
 import {
   DIFFICULTIES,
@@ -71,7 +71,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
         <input
           type="search"
           class="filter"
-          placeholder="Cerca per nome, abilità o testo nelle schede del bestiario…"
+          placeholder="Cerca per nome creatura o pagina del bestiario…"
           aria-label="Cerca nel bestiario"
           [value]="rawQuery()"
           (input)="onSearch($any($event.target).value)"
@@ -185,7 +185,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
             @if (!entries().length) {
               Caricamento del bestiario in corso…
             } @else {
-              {{ filtered().length }} {{ filtered().length === 1 ? 'scheda' : 'schede' }}
+              {{ filtered().length }} {{ filtered().length === 1 ? 'creatura' : 'creature' }}
               @if (filtered().length !== entries().length) { su {{ entries().length }} }
             }
           </span>
@@ -196,14 +196,15 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
       </section>
 
       <ul class="list bestiary-list">
-        @for (e of visible(); track e.docId) {
+        @for (e of visible(); track e.id) {
           <li class="bestiary-row">
             <div class="bestiary-main">
-              <a [routerLink]="['/doc', e.docId]" [queryParams]="{ from: 'bestiario' }">
+              <a [routerLink]="['/doc', e.docId]" [fragment]="e.anchor || undefined" [queryParams]="{ from: 'bestiario' }">
                 <app-icon [name]="'dragon'" />
                 <strong>{{ e.name }}</strong>
               </a>
               <span class="entry-meta muted">
+                @if (e.name.toLowerCase() !== e.docName.toLowerCase()) { in {{ e.docName }} · }
                 {{ e.category }}@if (e.subcategory) { › {{ e.subcategory }} }
                 @if (e.sizes.length) { · {{ e.sizes.join('/') }} }
                 @if (e.envs.length) { · {{ formatEnvs(e.envs) }} }
@@ -347,7 +348,7 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
           </div>
 
           <ul class="list enc-list">
-            @for (slot of encSlots(); track slot.entry.docId + ':' + slot.cr) {
+            @for (slot of encSlots(); track slot.entry.id + ':' + slot.cr) {
               <li class="enc-row">
                 <div class="enc-qty" role="group" [attr.aria-label]="'Quantità ' + slot.entry.name">
                   <button type="button" class="ghost qty-btn" (click)="adjustSlot($index, -1)" aria-label="Rimuovi uno">−</button>
@@ -356,11 +357,12 @@ function findBestiaryFolder(node: TreeNode | null): TreeNode | undefined {
                 </div>
 
                 <div class="bestiary-main">
-                  <a [routerLink]="['/doc', slot.entry.docId]" [queryParams]="{ from: 'incontro' }">
+                  <a [routerLink]="['/doc', slot.entry.docId]" [fragment]="slot.entry.anchor || undefined" [queryParams]="{ from: 'incontro' }">
                     <app-icon [name]="'dragon'" />
                     <strong>{{ slot.entry.name }}</strong>
                   </a>
                   <span class="entry-meta muted">
+                    @if (slot.entry.name.toLowerCase() !== slot.entry.docName.toLowerCase()) { in {{ slot.entry.docName }} · }
                     {{ slot.entry.category }}@if (slot.entry.subcategory) { › {{ slot.entry.subcategory }} }
                     @if (slot.entry.sizes.length) { · {{ slot.entry.sizes.join('/') }} }
                     @if (slot.entry.envs.length) { · {{ formatEnvs(slot.entry.envs) }} }
@@ -467,14 +469,14 @@ export class BestiaryComponent {
   readonly folders = computed(() => (this.bestiaryFolder()?.children ?? []).filter(c => c.kind === 'folder'));
   readonly rootFiles = computed(() => (this.bestiaryFolder()?.children ?? []).filter(c => isDocNode(c)));
 
-  /** Tutte le schede del Bestiario indicizzate con CR, tipo, ambiente e taglia. */
+  /** Tutte le creature del Bestiario (espanse per singola sezione stat-block) con CR, tipo, ambiente e taglia. */
   readonly entries = computed<BestiaryEntry[]>(() => {
     this.library.version();
     this.library.tree();
     const out: BestiaryEntry[] = [];
     for (const m of this.library.allMetas()) {
       if (!this.library.isBestiary(m.id)) continue;
-      out.push(extractBestiaryEntry(m, this.library.pathOf(m.id)));
+      out.push(...extractBestiaryEntries(m, this.library.pathOf(m.id)));
     }
     return out.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }));
   });
@@ -533,45 +535,50 @@ export class BestiaryComponent {
     const ch = this.letter();
     const sort = this.sort();
 
-    // Se c'è una query testuale, uniamo match diretto su nome/titoli + risultati full-text MiniSearch
-    let fullTextIds: Set<string> | null = null;
-    if (q) {
-      fullTextIds = new Set(this.library.search(q, 250, 'bestiary').map(h => h.docId));
-    }
-
-    const list = this.entries().filter(e => {
-      if (cat && e.category !== cat) return false;
-      if (sub && e.subcategory !== sub) return false;
-      if (ch && e.letter !== ch) return false;
-      if (env && !e.envs.includes(env)) return false;
-      if (sz && !e.sizes.includes(sz)) return false;
-      if (filterCr) {
-        if (!e.crs.length) return false;
-        if (!e.crs.some(c => c >= minCr - 0.001 && c <= maxCr + 0.001)) return false;
-      }
-      if (q && !e.searchBlob.includes(q) && !fullTextIds?.has(e.docId)) return false;
-      return true;
-    });
-
     const cmpName = (a: BestiaryEntry, b: BestiaryEntry) =>
       a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' });
-
-    if (sort === 'name-desc') return [...list].sort((a, b) => cmpName(b, a));
-    if (sort === 'cr-asc') {
-      return [...list].sort((a, b) => {
+    const cmpSort = (a: BestiaryEntry, b: BestiaryEntry) => {
+      if (sort === 'name-desc') return cmpName(b, a);
+      if (sort === 'cr-asc') {
         const ca = a.crMin ?? 999;
         const cb = b.crMin ?? 999;
         return ca !== cb ? ca - cb : cmpName(a, b);
-      });
-    }
-    if (sort === 'cr-desc') {
-      return [...list].sort((a, b) => {
+      }
+      if (sort === 'cr-desc') {
         const ca = a.crMax ?? -1;
         const cb = b.crMax ?? -1;
         return ca !== cb ? cb - ca : cmpName(a, b);
-      });
+      }
+      return cmpName(a, b);
+    };
+
+    const byName: BestiaryEntry[] = [];
+    const byDoc: BestiaryEntry[] = [];
+    for (const e of this.entries()) {
+      if (cat && e.category !== cat) continue;
+      if (sub && e.subcategory !== sub) continue;
+      if (ch && e.letter !== ch) continue;
+      if (env && !e.envs.includes(env)) continue;
+      if (sz && !e.sizes.includes(sz)) continue;
+      if (filterCr) {
+        if (!e.crs.length) continue;
+        if (!e.crs.some(c => c >= minCr - 0.001 && c <= maxCr + 0.001)) continue;
+      }
+      if (!q) {
+        byName.push(e);
+      } else if (e.name.toLowerCase().includes(q)) {
+        byName.push(e);
+      } else if (e.docName.toLowerCase().includes(q)) {
+        byDoc.push(e);
+      }
     }
-    return list;
+
+    if (sort !== 'name-asc') byName.sort(cmpSort);
+    if (byDoc.length) {
+      if (sort !== 'name-asc') byDoc.sort(cmpSort);
+      return [...byName, ...byDoc];
+    }
+    return byName;
   });
 
   readonly visible = computed(() => this.filtered().slice(0, this.limit()));
@@ -669,7 +676,7 @@ export class BestiaryComponent {
     const list = this.encSlots();
     const cur = list[index];
     if (!cur) return;
-    const exclude = new Set(list.map(s => s.entry.docId));
+    const exclude = new Set(list.map(s => s.entry.id));
     const next = rerollSlot(this.encPool(), cur, exclude);
     if (!next) return;
     this.encSlots.update(items => items.map((s, i) => (i === index ? next : s)));
