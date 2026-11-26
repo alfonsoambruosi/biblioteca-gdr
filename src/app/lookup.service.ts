@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { LibraryService } from './library.service';
 import { esc, normTerm, sliceSectionFromDoc, tokenKey } from './doc-parser';
 import { environment } from '../environments/environment';
+import { CUSTOM_DOC_ID, CUSTOM_DOC_NAME, CUSTOM_ENTRIES, customEntryHtml } from './custom-entries';
 import { TreeNode } from './models';
 
 const DOM_CACHE_MAX = 6;
@@ -71,6 +72,17 @@ export class LookupService {
         push(byToken, tokenKey(s.heading), ref);
       }
     }
+    for (const e of CUSTOM_ENTRIES) {
+      const ref: EntryRef = {
+        docId: CUSTOM_DOC_ID,
+        docName: CUSTOM_DOC_NAME,
+        anchor: e.id,
+        heading: e.heading,
+        level: e.level,
+      };
+      push(byNorm, normTerm(e.heading), ref);
+      push(byToken, tokenKey(e.heading), ref);
+    }
     for (const list of byNorm.values()) list.sort((a, b) => a.level - b.level);
     for (const list of byToken.values()) list.sort((a, b) => a.level - b.level);
     this.entryIndexCache = { v, byNorm, byToken };
@@ -135,6 +147,7 @@ export class LookupService {
 
   /** HTML integrale di una voce (titolo + tutto il testo fino alla voce successiva). */
   async entryHtml(ref: EntryRef): Promise<string> {
+    if (ref.docId === CUSTOM_DOC_ID) return customEntryHtml(ref.anchor);
     const doc = await this.parsedDoc(ref.docId);
     return sliceSectionFromDoc(doc, ref.anchor);
   }

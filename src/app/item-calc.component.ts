@@ -6,6 +6,7 @@ import { TermTarget } from './term-links';
 import { ModKind, Modifier, calcItem, levelAdjFromText } from './item-calc';
 import { ITEM_PRESETS, ItemPreset } from './item-presets';
 import { COMPOSITE_ITEMS, CompositeItem, CompositePart } from './item-composite';
+import { CUSTOM_DOC_ID, CUSTOM_DOC_NAME, CUSTOM_ENTRIES } from './custom-entries';
 
 interface SpellOption {
   key: string;
@@ -335,6 +336,18 @@ export class ItemCalcComponent {
           out.abilita.push({ name: cleanName(s.heading), ref, adj, note });
         }
       }
+    }
+    // voci editoriali aggiunte dal sito (es. Effect-Specific Spell)
+    for (const e of CUSTOM_ENTRIES) {
+      if (e.kind !== 'metamagia') continue;
+      const ref: TermTarget = {
+        docId: CUSTOM_DOC_ID,
+        docName: CUSTOM_DOC_NAME,
+        anchor: e.id,
+        heading: e.heading,
+        level: e.level,
+      };
+      out.metamagia.push({ name: cleanName(e.heading), ref, adj: e.adj, note: 'aggiunta dal sito' });
     }
     // componenti del Compendio assenti dalla biblioteca
     const known = new Set(out.metamagia.map(o => tokenKey(o.name)));

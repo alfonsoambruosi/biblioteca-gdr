@@ -7,6 +7,7 @@ import { PARSER_VERSION, enrichHtml, esc, normTerm } from './doc-parser';
 import { DocMeta, SearchHit, Section, TreeNode } from './models';
 import { TermMap, TermTarget, buildTermMap, namesOf } from './term-links';
 import { compressImageToDataUri } from './image-compress';
+import { CUSTOM_DOC_ID, CUSTOM_DOC_META, CUSTOM_DOC_NAME, CUSTOM_ENTRIES, CUSTOM_TREE_NODE, customDocHtml } from './custom-entries';
 
 const STYLE_MAP = [
   "p[style-name='Title'] => h1:fresh",
@@ -492,6 +493,19 @@ export class LibraryService {
         }
       }
     }
+    for (const e of CUSTOM_ENTRIES) {
+      const ref: TermTarget = {
+        docId: CUSTOM_DOC_ID,
+        docName: CUSTOM_DOC_NAME,
+        anchor: e.id,
+        heading: e.heading,
+        level: e.level,
+      };
+      const names = namesOf(e.heading);
+      for (const n of names.full) {
+        if (n.length >= 5 && n.length <= 80 && !GENERIC_HEADINGS.has(n.toLowerCase())) full.push([n, ref]);
+      }
+    }
     const terms = buildTermMap([...full, ...derived]);
     this.linkCache = { v, terms };
     return terms;
@@ -549,6 +563,7 @@ export class LibraryService {
   }
 
   node(id: string): TreeNode | undefined {
+    if (id === CUSTOM_DOC_ID) return CUSTOM_TREE_NODE;
     return this.nodes.get(id);
   }
 
@@ -573,6 +588,7 @@ export class LibraryService {
   }
 
   meta(id: string): DocMeta | undefined {
+    if (id === CUSTOM_DOC_ID) return CUSTOM_DOC_META;
     return this.metas.get(id);
   }
 
@@ -729,6 +745,7 @@ export class LibraryService {
 
   /** HTML di un documento: dalla copia salvata; se manca lo scarica subito. */
   async getHtml(id: string): Promise<string> {
+    if (id === CUSTOM_DOC_ID) return customDocHtml();
     const node = this.nodes.get(id);
     if (!node) throw new Error('Documento non trovato nel Drive.');
     if (this.isStale(node)) await this.sync(node);
@@ -752,6 +769,10 @@ export class LibraryService {
         const norm = normTerm(s.heading);
         if (norm) entries.push({ m, s, norm, bestiary });
       }
+    }
+    for (const s of CUSTOM_DOC_META.sections) {
+      const norm = normTerm(s.heading);
+      if (norm) entries.push({ m: CUSTOM_DOC_META, s, norm, bestiary: false });
     }
     this.headingCache = { v, entries };
     return entries;
