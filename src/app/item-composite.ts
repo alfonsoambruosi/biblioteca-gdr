@@ -73,12 +73,12 @@ export const COMPOSITE_ITEMS: CompositeItem[] = [
     { kind: 'formula', label: 'breath of life, 1/giorno', level: 5, cl: 9, price: 900, mult: 0.2 },
     { kind: 'formula', label: 'costo della spell latente', level: 5, cl: 9, price: 50, mult: 1 },
   ] },
-  { name: 'Grinding', unit: 'numen', stated: 3025, note: 'La formula stampata dà livello 0 e 0 numen: uso i valori del libro.', parts: [
-    { kind: 'fixed', label: 'continuo, 6 round', total: 3000 },
-    { kind: 'fixed', label: 'effetto latente', total: 25 },
+  { name: 'Grinding', unit: 'numen', stated: 3025, parts: [
+    { kind: 'formula', label: 'continuo, 6 round', level: 0, cl: 1, price: 1000, mult: 6 },
+    { kind: 'formula', label: 'effetto latente', level: 0, cl: 1, price: 50, mult: 1 },
   ] },
-  { name: 'Stanching', unit: 'numen', stated: 4000, note: 'La formula stampata è incoerente (livello 0): uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'stabilize, continuo', total: 4000 },
+  { name: 'Stanching', unit: 'numen', stated: 4000, parts: [
+    { kind: 'formula', label: 'stabilize, continuo', level: 0, cl: 1, price: 1000, mult: 8 },
   ] },
   { name: 'Reliquary', unit: 'numen', stated: 5000, note: 'La formula dà 6.000: il libro stampa 5.000.', parts: [
     { kind: 'formula', label: 'consecrate o desecrate', level: 2, cl: 3, price: 1000, mult: 1 },
@@ -98,8 +98,8 @@ export const COMPOSITE_ITEMS: CompositeItem[] = [
   { name: 'Potion of Longevity', unit: 'gp', stated: 4450, note: 'La formula dà 4.550 gp: il libro stampa 4.450.', parts: [
     { kind: 'formula', label: 'extend life con mass effect', level: 7, cl: 13, price: 50, mult: 1 },
   ] },
-  { name: 'Belladonna', unit: 'gp', stated: 75, note: 'Il libro indica 75 gp a dose (100 in listino) e 450 numen per la scorta: la scorta dal libro non coincide con 18 volte i gp.', parts: [
-    { kind: 'fixed', label: 'dose', total: 75 },
+  { name: 'Belladonna', unit: 'gp', stated: 75, note: 'Il libro indica 450 numen per la scorta: 18 volte i 75 gp darebbero 1.350.', parts: [
+    { kind: 'formula', label: 'damage attribute e modificatori', level: 0, cl: 3, price: 50, mult: 1 },
   ] },
   { name: 'Tears of Death', unit: 'gp', stated: 1800, note: 'Scorta privata: 32.400 numen.', parts: [
     { kind: 'formula', label: 'damage attribute e modificatori', level: 6, cl: 6, price: 50, mult: 1 },
@@ -107,8 +107,8 @@ export const COMPOSITE_ITEMS: CompositeItem[] = [
   { name: 'Spread of Savagery', unit: 'gp', stated: 1800, note: 'Il libro non indica l’unità del prezzo: trattato come gp.', parts: [
     { kind: 'formula', label: 'savagery', level: 4, cl: 9, price: 50, mult: 1 },
   ] },
-  { name: 'Dust of Tracelessness', unit: 'gp', stated: 250, note: 'Il libro dà un livello frazionario: uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'dose', total: 250 },
+  { name: 'Dust of Tracelessness', unit: 'gp', stated: 250, note: 'La formula dà 500 gp con livello 0,5: il libro stampa 250.', parts: [
+    { kind: 'formula', label: 'passaggio senza tracce', level: 0, cl: 20, price: 50, mult: 1 },
   ] },
   { name: 'Unholy', unit: 'numen', stated: 24000, note: 'La formula dà 16.000: il libro stampa 24.000.', parts: [
     { kind: 'formula', label: 'ray of entropy, 8 istantaneo', level: 2, cl: 2, price: 500, mult: 8 },
@@ -117,34 +117,34 @@ export const COMPOSITE_ITEMS: CompositeItem[] = [
     { kind: 'formula', label: 'skill enhancement + channel, 2 (1 min./livello)', level: 1, cl: 10, price: 500, mult: 2 },
   ] },
   { name: 'Entangling', unit: 'numen', stated: 2000, note: 'Ogni round di durata in più costa altri 2.000 numen.', parts: [
-    { kind: 'fixed', label: 'bind, istantaneo', total: 2000 },
+    { kind: 'formula', label: 'bind, istantaneo, 8', level: 0, cl: 1, price: 500, mult: 8 },
   ] },
   { name: 'Holy', unit: 'numen', stated: 16000, parts: [
     { kind: 'formula', label: 'bolt of force con consecrate, istantaneo', level: 2, cl: 2, price: 500, mult: 8 },
   ] },
-  { name: 'Shieldsplitter', unit: 'numen', stated: 6000, note: 'La formula stampata è incoerente (livello 0): uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'invocation of the knife, 8', total: 6000 },
+  { name: 'Shieldsplitter', unit: 'numen', stated: 6000, parts: [
+    { kind: 'formula', label: 'invocation of the knife, 8', level: 0, cl: 3, price: 500, mult: 8 },
   ] },
-  { name: 'Vicious', unit: 'numen', stated: 8000, note: 'La formula stampata è incoerente (livello 0): uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'ray of entropy, 8', total: 8000 },
+  { name: 'Vicious', unit: 'numen', stated: 8000, note: 'La formula dà 4.000 con livello 0,5: il libro stampa 8.000.', parts: [
+    { kind: 'formula', label: 'ray of entropy, 8', level: 0, cl: 2, price: 500, mult: 8 },
   ] },
-  { name: 'Wounding', unit: 'numen', stated: 6000, note: 'La formula stampata è incoerente (livello 0): uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'invocation of the knife, 8', total: 6000 },
+  { name: 'Wounding', unit: 'numen', stated: 6000, parts: [
+    { kind: 'formula', label: 'invocation of the knife, 8', level: 0, cl: 3, price: 500, mult: 8 },
   ] },
-  { name: 'Weakening', unit: 'numen', stated: 250, note: 'Livello frazionario nel libro: uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'damage attribute, 8', total: 250 },
+  { name: 'Weakening', unit: 'numen', stated: 250, note: 'La formula dà 2.000 con livello 0,5: il libro stampa 250.', parts: [
+    { kind: 'formula', label: 'damage attribute, 8', level: 0, cl: 1, price: 500, mult: 8 },
   ] },
   { name: 'Spark of life', unit: 'numen', stated: 2500, note: 'La formula dà 3.000: il libro stampa 2.500.', parts: [
     { kind: 'fixed', label: 'spark of life, contingente', total: 2500 },
   ] },
-  { name: 'Sickening touch (paura)', unit: 'numen', stated: 250, note: 'Livello 0 nel libro: uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'sickening touch, contingente', total: 250 },
+  { name: 'Sickening touch (paura)', unit: 'numen', stated: 250, parts: [
+    { kind: 'formula', label: 'sickening touch, contingente', level: 0, cl: 1, price: 500, mult: 1 },
   ] },
-  { name: 'Everburning Torch', unit: 'numen', stated: 750, note: 'Livello 0 nel libro: uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'light, continuo', total: 750 },
+  { name: 'Everburning Torch', unit: 'numen', stated: 750, parts: [
+    { kind: 'formula', label: 'light, continuo, 1,5', level: 0, cl: 1, price: 1000, mult: 1.5 },
   ] },
-  { name: 'Stream', unit: 'numen', stated: 900, note: 'Livello 0 nel libro: uso il totale del libro.', parts: [
-    { kind: 'fixed', label: 'create water', total: 900 },
+  { name: 'Stream', unit: 'numen', stated: 900, parts: [
+    { kind: 'formula', label: 'create water', level: 0, cl: 2, price: 900, mult: 1 },
   ] },
   { name: 'Amulet of Spell Resistance', unit: 'numen', stated: 90000, note: 'SR 25 con Carisma = metà del livello. Ogni punto in più o in meno: ±10.000 numen.', parts: [
     { kind: 'formula', label: 'spell resistance', level: 5, cl: 9, price: 1000, mult: 2 },
